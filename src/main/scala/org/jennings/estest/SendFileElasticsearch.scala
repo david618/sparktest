@@ -6,7 +6,7 @@ import org.elasticsearch.spark.rdd.EsSpark
 /**
   * Created by david on 11/4/17.
   */
-object SendFileElasticsearchFile {
+object SendFileElasticsearch {
 
   // spark-submit --class org.jennings.estest.SendFileElasticsearchFile --master local[8] target/estest.jar planes00001 a1 9200 local[16] planes/events
 
@@ -33,7 +33,7 @@ object SendFileElasticsearchFile {
 
     val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
 
-    println("Sending " + filename + " to " + esServer + ":" + esPort + " using " +spkMaster)
+    println("Sending " + filename + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
     val sparkConf = new SparkConf().setAppName(appName).setMaster(spkMaster)
     sparkConf.set("es.index.auto.create", "true")
