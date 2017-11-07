@@ -1,6 +1,7 @@
 package org.jennings.estest
 
 import java.io.File
+import java.nio.file.Files
 
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -39,22 +40,27 @@ object SearchFolderLinesContainingString {
     val sc = new SparkContext(sparkConf)
 
     val folder = new File(foldername)
-    
-    val files = folder.listFiles().iterator
 
+    val fileArray = folder.list()
 
-    println("Number of lines containing: %s".format(searchString))
-    while (files.hasNext) {
-      val file = files.next
-      val filename = foldername + File.separator + file.getName
-      println(filename)
-      val textFile =  sc.textFile(filename)
+    if (fileArray == null) {
+      println("No files in %s".format(folder))
+    } else {
+      val files =  fileArray.sortWith(_ < _).iterator
+      println("Number of lines containing: %s".format(searchString))
+      while (files.hasNext) {
+        val file = files.next
+        val filename = foldername + File.separator + file
+        val textFile =  sc.textFile(filename)
 
-      // Search for patterns on lines and count them
-      val numLines = textFile.filter(line => line.contains(searchString)).count()
-      println("%s: %s".format(filename, numLines))
+        // Search for patterns on lines and count them
+        val numLines = textFile.filter(line => line.contains(searchString)).count()
+        println("%s: %s".format(filename, numLines))
 
+      }
     }
+
+
 
 
   }

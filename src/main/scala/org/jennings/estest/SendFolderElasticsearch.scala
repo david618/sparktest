@@ -52,17 +52,23 @@ object SendFolderElasticsearch {
 
     val folder = new File(foldername)
 
-    val files = folder.listFiles().iterator
+    val fileArray = folder.list()
 
-    while (files.hasNext) {
-      // For each file in the folder
-      val file = files.next
-      val filename = foldername + File.separator + file.getName
-      println("Sending: " + filename)
-      val textFile =  sc.textFile(filename)
+    if (fileArray == null) {
+      println("No files in %s".format(folder))
+    } else {
+      val files = fileArray.sortWith(_ < _).iterator
 
-      EsSpark.saveJsonToEs(textFile, indexAndType)
+      while (files.hasNext) {
+        // For each file in the folder
+        val file = files.next
+        val filename = foldername + File.separator + file
+        val textFile =  sc.textFile(filename)
 
+
+        EsSpark.saveJsonToEs(textFile, indexAndType)
+
+      }
     }
   }
 }
