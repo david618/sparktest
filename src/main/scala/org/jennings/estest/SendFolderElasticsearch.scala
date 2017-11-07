@@ -1,12 +1,14 @@
 package org.jennings.estest
 
+import java.io.File
+
 import org.apache.spark.{SparkConf, SparkContext}
 import org.elasticsearch.spark.rdd.EsSpark
 
 /**
   * Created by david on 11/4/17.
   */
-object SendFileElasticsearch {
+object SendFolderElasticsearch {
 
   // spark-submit --class org.jennings.estest.SendFileElasticsearch target/estest.jar planes00001 a1 9200 local[16] planes/planes
 
@@ -21,8 +23,8 @@ object SendFileElasticsearch {
     val numargs = args.length
 
     if (numargs != 5) {
-      System.err.println("Usage: SendFileElasticsearchFile Filename ESServer ESPort SpkMaster")
-      System.err.println("        Filename: JsonFile to Process")
+      System.err.println("Usage: SendFileElasticsearchFile Foldername ESServer ESPort SpkMaster")
+      System.err.println("        Folder: Folder containing json files to send")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
       System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")
       System.err.println("        SpkMaster: Spark Master (e.g. local[8])")
@@ -31,9 +33,9 @@ object SendFileElasticsearch {
 
     }
 
-    val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
+    val Array(foldername,esServer,esPort,spkMaster,indexAndType) = args
 
-    println("Sending " + filename + " to " + esServer + ":" + esPort + " using " + spkMaster)
+    println("Sending files from folder " + foldername + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
     val sparkConf = new SparkConf().setAppName(appName).setMaster(spkMaster)
     sparkConf.set("es.index.auto.create", "true")
@@ -47,9 +49,20 @@ object SendFileElasticsearch {
 
     val sc = new SparkContext(sparkConf)
 
-    val textFile =  sc.textFile(filename)
 
-    EsSpark.saveJsonToEs(textFile, indexAndType)
+    val folder = new File(foldername)
 
+    val files = folder.listFiles().iterator
+
+    while (files.hasNext) {
+      // For each file in the folder
+      val file = files.next
+      val filename = foldername + File.separator + file.getName
+      println("Sending: " + filename)
+      val textFile =  sc.textFile(filename)
+
+      EsSpark.saveJsonToEs(textFile, indexAndType)
+
+    }
   }
 }
