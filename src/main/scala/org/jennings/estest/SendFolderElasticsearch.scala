@@ -62,6 +62,7 @@ object SendFolderElasticsearch {
       while (files.hasNext) {
         // For each file in the folder
         val file = files.next
+        println(file)
         val filename = foldername + File.separator + file
         val textFile =  sc.textFile(filename)
 
