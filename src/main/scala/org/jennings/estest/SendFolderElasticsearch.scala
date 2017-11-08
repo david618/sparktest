@@ -27,7 +27,7 @@ object SendFolderElasticsearch {
       System.err.println("        Folder: Folder containing json files to send")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
       System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")
-      System.err.println("        SpkMaster: Spark Master (e.g. local[8])")
+      System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
       System.err.println("        IndexType: Index/Type (e.g. planes/events")
       System.exit(1)
 
@@ -37,7 +37,10 @@ object SendFolderElasticsearch {
 
     println("Sending files from folder " + foldername + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
-    val sparkConf = new SparkConf().setAppName(appName).setMaster(spkMaster)
+    val sparkConf = new SparkConf().setAppName(appName)
+    if (!spkMaster.equalsIgnoreCase("-")) {
+      sparkConf.setMaster(spkMaster)
+    }
     sparkConf.set("es.index.auto.create", "true")
     sparkConf.set("spark.es.nodes",esServer)
     sparkConf.set("spark.es.port", esPort)

@@ -25,7 +25,7 @@ object SendFileElasticsearch {
       System.err.println("        Filename: JsonFile to Process")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
       System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")
-      System.err.println("        SpkMaster: Spark Master (e.g. local[8])")
+      System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
       System.err.println("        IndexType: Index/Type (e.g. planes/events")
       System.exit(1)
 
