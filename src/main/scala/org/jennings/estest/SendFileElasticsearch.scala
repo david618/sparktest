@@ -31,23 +31,26 @@ object SendFileElasticsearch {
 
     }
 
-    val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
+    val Array(filename, esServer, esPort, spkMaster, indexAndType) = args
 
     println("Sending " + filename + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
-    val sparkConf = new SparkConf().setAppName(appName).setMaster(spkMaster)
+    val sparkConf = new SparkConf().setAppName(appName)
+    if (!spkMaster.equalsIgnoreCase("-")) {
+      sparkConf.setMaster(spkMaster)
+    }
     sparkConf.set("es.index.auto.create", "true")
-    sparkConf.set("spark.es.nodes",esServer)
+    sparkConf.set("spark.es.nodes", esServer)
     sparkConf.set("spark.es.port", esPort)
     // Without the following it would not create the index on single-node mode
     sparkConf.set("es.nodes.discovery", "false")
     sparkConf.set("es.nodes.data.only", "false")
     // Without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
-    sparkConf.set("es.nodes.wan.only","true")
+    sparkConf.set("es.nodes.wan.only", "true")
 
     val sc = new SparkContext(sparkConf)
 
-    val textFile =  sc.textFile(filename)
+    val textFile = sc.textFile(filename)
 
     EsSpark.saveJsonToEs(textFile, indexAndType)
 
