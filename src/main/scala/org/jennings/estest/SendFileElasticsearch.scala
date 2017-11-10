@@ -20,18 +20,20 @@ object SendFileElasticsearch {
 
     val numargs = args.length
 
-    if (numargs != 5 && numargs != 7) {
+    if (numargs != 7) {
       System.err.println("Usage: SendFileElasticsearchFile Filename ESServer ESPort SpkMaster")
       System.err.println("        Filename: JsonFile to Process")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
       System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")
       System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
       System.err.println("        IndexType: Index/Type (e.g. planes/events")
-      System.err.println("        Username: Elasticsearch Username (optional)")
-      System.err.println("        Password: Elasticsearch Password (optional)")
+      System.err.println("        Username: Elasticsearch Username (Enter - for no username)")
+      System.err.println("        Password: Elasticsearch Password (Enter - for no password)")
       System.exit(1)
 
     }
+
+
 
     val Array(filename, esServer, esPort, spkMaster, indexAndType,username,password) = args
 
