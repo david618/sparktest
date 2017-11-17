@@ -33,7 +33,7 @@ object SearchFileLinesContainingString {
 
     println("Find the number of line in file named " + filename + " that contain " + searchString + " ")
 
-    val sparkConf = new SparkConf().setAppName(appName).setMaster("local[8]")
+    val sparkConf = new SparkConf().setAppName(appName).setMaster("local[16]")
 
     val sc = new SparkContext(sparkConf)
 
