@@ -23,17 +23,25 @@ object SendFolderElasticsearch {
     val numargs = args.length
 
     if (numargs != 5) {
-      System.err.println("Usage: SendFileElasticsearchFile Foldername ESServer ESPort SpkMaster")
+      System.err.println("Usage: SendFileElasticsearchFile Foldername ESServer ESPort SpkMaster (Username) (Password)")
       System.err.println("        Folder: Folder containing json files to send")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
       System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")
       System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
       System.err.println("        IndexType: Index/Type (e.g. planes/events")
+      System.err.println("        Username: Elasticsearch Username (optional)")
+      System.err.println("        Password: Elasticsearch Password (optional)")
       System.exit(1)
 
     }
 
-    val Array(foldername,esServer,esPort,spkMaster,indexAndType) = args
+    val foldername = args(0)
+    val esServer = args(1)
+    val esPort = args(2)
+    val spkMaster = args(3)
+    val indexAndType = args(4)
+
+    //val Array(foldername,esServer,esPort,spkMaster,indexAndType) = args
 
     println("Sending files from folder " + foldername + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
@@ -49,6 +57,13 @@ object SendFolderElasticsearch {
     sparkConf.set("es.nodes.data.only", "false")
     // Without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
     sparkConf.set("es.nodes.wan.only","true")
+
+    if (numargs == 7) {
+      val username = args(5)
+      val password = args(6)
+      sparkConf.set("es.net.http.auth.user", username)
+      sparkConf.set("es.net.http.auth.pass", password)
+    }
 
     val sc = new SparkContext(sparkConf)
 
