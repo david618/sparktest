@@ -60,9 +60,9 @@ object SendS3FileElasticsearch {
     // Without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
     sparkConf.set("es.nodes.wan.only", "true")
 
-    sparkConf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-    sparkConf.set("spark.hadoop.fs.s3a.access.key", accessKey)
-    sparkConf.set("spark.hadoop.fs.s3a.secret.key", secretKey)
+//    sparkConf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+//    sparkConf.set("spark.hadoop.fs.s3a.access.key", accessKey)
+//    sparkConf.set("spark.hadoop.fs.s3a.secret.key", secretKey)
 
 
     if (numargs == 9) {
@@ -74,6 +74,11 @@ object SendS3FileElasticsearch {
 
 
     val sc = new SparkContext(sparkConf)
+
+    sc.hadoopConfiguration.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+    sc.hadoopConfiguration.set("fs.s3a.access.key", accessKey)
+    sc.hadoopConfiguration.set("fs.s3a.secret.key", secretKey)
+    sc.hadoopConfiguration.setInt("fs.s3a.connection.maximum",5000)
 
     val textFile = sc.textFile(filename)
 

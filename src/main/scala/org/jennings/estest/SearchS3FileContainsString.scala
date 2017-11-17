@@ -27,18 +27,20 @@ object SearchS3FileContainsString {
 
     println("Find the number of lines in file named " + filename + " that contain " + searchString + " ")
 
-    val sparkConf = new SparkConf().setAppName(appName).setMaster("local[8]")
+    val sparkConf = new SparkConf().setAppName(appName).setMaster("local[64]")
 
-    sparkConf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-    sparkConf.set("spark.hadoop.fs.s3a.access.key", accessKey)
-    sparkConf.set("spark.hadoop.fs.s3a.secret.key", secretKey)
+    //sparkConf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+    //sparkConf.set("spark.hadoop.fs.s3a.access.key", accessKey)
+    //sparkConf.set("spark.hadoop.fs.s3a.secret.key", secretKey)
+
 
 
     val sc = new SparkContext(sparkConf)
 
-    //sc.hadoopConfiguration.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-    //sc.hadoopConfiguration.set("fs.s3a.access.key", accessKey)
-    //sc.hadoopConfiguration.set("fs.s3a.secret.key", secretKey)
+    sc.hadoopConfiguration.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+    sc.hadoopConfiguration.set("fs.s3a.access.key", accessKey)
+    sc.hadoopConfiguration.set("fs.s3a.secret.key", secretKey)
+    sc.hadoopConfiguration.setInt("fs.s3a.connection.maximum",5000)
 
     val textFile =  sc.textFile(filename)
 
