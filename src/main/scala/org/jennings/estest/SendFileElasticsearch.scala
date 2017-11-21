@@ -44,6 +44,7 @@ object SendFileElasticsearch {
     println("Sending " + filename + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
     val sparkConf = new SparkConf().setAppName(appName)
+    sparkConf.set("spark.port.maxRetries", "50")
     if (!spkMaster.equalsIgnoreCase("-")) {
       sparkConf.setMaster(spkMaster)
     }
