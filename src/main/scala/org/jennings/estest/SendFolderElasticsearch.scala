@@ -22,7 +22,7 @@ object SendFolderElasticsearch {
 
     val numargs = args.length
 
-    if (numargs != 5 || numargs != 7) {
+    if (numargs != 5 && numargs != 7) {
       System.err.println("Usage: SendFileElasticsearchFolder Foldername ESServer ESPort SpkMaster (Username) (Password)")
       System.err.println("        Folder: Folder containing json files to send")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
