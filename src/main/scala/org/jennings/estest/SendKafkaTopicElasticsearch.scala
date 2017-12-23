@@ -96,7 +96,13 @@ object SendKafkaTopicElasticsearch {
     )
 
     stream.foreachRDD { rdd =>
-      EsSpark.saveJsonToEs(rdd, indexAndType)
+
+      //rdd.map(_.value())
+      EsSpark.saveJsonToEs(rdd.map(_.value), indexAndType)
+//      println(rdd.count());
+//      rdd.foreach { f =>
+//        println(f.value())
+//      }
     }
 
     ssc.start()
