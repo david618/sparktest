@@ -47,7 +47,7 @@ object SendKafkaTopicElasticsearch {
     val esPort = args(3)
     val spkMaster = args(4)
     val indexAndType = args(5)
-    val sparkStreamSeconds = args(6).asInstanceOf[Long]
+    val sparkStreamSeconds = args(6).toLong
 
     //val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
 
