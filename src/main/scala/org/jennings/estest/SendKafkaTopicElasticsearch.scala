@@ -26,14 +26,15 @@ object SendKafkaTopicElasticsearch {
 
     val numargs = args.length
 
-    if (numargs != 6 && numargs != 8) {
-      System.err.println("Usage: SendKafkaTopicElasticsearch broker topic ESServer ESPort SpkMaster (Username) (Password)")
+    if (numargs != 7 && numargs != 9) {
+      System.err.println("Usage: SendKafkaTopicElasticsearch broker topic ESServer ESPort SpkMaster StreamingIntervalSec (Username) (Password)")
       System.err.println("        broker: Server:IP")
       System.err.println("        topic: Kafka Topic Name")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
       System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")
       System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
       System.err.println("        IndexType: Index/Type (e.g. planes/events")
+      System.err.println("        Spark Streaming Interval Seconds (e.g. 1")
       System.err.println("        Username: Elasticsearch Username (optional)")
       System.err.println("        Password: Elasticsearch Password (optional)")
       System.exit(1)
@@ -46,6 +47,7 @@ object SendKafkaTopicElasticsearch {
     val esPort = args(3)
     val spkMaster = args(4)
     val indexAndType = args(5)
+    val sparkStreamSeconds = args(6).asInstanceOf[Long]
 
     //val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
 
@@ -65,9 +67,9 @@ object SendKafkaTopicElasticsearch {
     sparkConf.set("es.nodes.wan.only", "true")
 
 
-    if (numargs == 8) {
-      val username = args(6)
-      val password = args(7)
+    if (numargs == 9) {
+      val username = args(7)
+      val password = args(8)
       sparkConf.set("es.net.http.auth.user", username)
       sparkConf.set("es.net.http.auth.pass", password)
     }
@@ -87,7 +89,7 @@ object SendKafkaTopicElasticsearch {
     val sc = new SparkContext(sparkConf)
 
 
-    val ssc = new StreamingContext(sc, Seconds(1))
+    val ssc = new StreamingContext(sc, Seconds(sparkStreamSeconds))
 
     val stream = KafkaUtils.createDirectStream[String, String](
       ssc,
@@ -97,15 +99,19 @@ object SendKafkaTopicElasticsearch {
 
     stream.foreachRDD { rdd =>
 
-      val tsRDD = rdd.map(_.value)
-
       //rdd.map(_.value())
-      val thread = new Thread {
-        override def run: Unit = {
-          EsSpark.saveJsonToEs(tsRDD, indexAndType)
-        }
-      }
-      thread.start
+
+      val tsRDD = rdd.map(_.value)
+      EsSpark.saveJsonToEs(tsRDD, indexAndType)
+
+      // Error KafkaConsumer is not thread safe errors when trying the following
+
+//      val thread = new Thread {
+//        override def run: Unit = {
+//          EsSpark.saveJsonToEs(tsRDD, indexAndType)
+//        }
+//      }
+//      thread.start
 //      println(rdd.count());
 //      rdd.foreach { f =>
 //        println(f.value())
