@@ -8,7 +8,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.JavaConversions._
 
-object SendS3FilesCount {
+object S3TextFilesCountLines {
 
 
 
