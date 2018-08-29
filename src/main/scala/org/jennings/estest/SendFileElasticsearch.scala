@@ -10,7 +10,7 @@ object SendFileElasticsearch {
 
   // spark-submit --class org.jennings.estest.SendFileElasticsearch target/estest.jar planes00001 a1 9200 local[16] planes/planes
 
-  // java -cp target/estest.jar org.jennings.estest.SendFileElasticsearchFile
+  // java -cp target/sparktest.jar org.jennings.estest.SendFileElasticsearch
 
   def main(args: Array[String]): Unit = {
 
@@ -21,7 +21,7 @@ object SendFileElasticsearch {
     val numargs = args.length
 
     if (numargs != 5 && numargs != 7) {
-      System.err.println("Usage: SendFileElasticsearchFile Filename ESServer ESPort SpkMaster (Username) (Password)")
+      System.err.println("Usage: SendFileElasticsearch Filename ESServer ESPort SpkMaster (Username) (Password)")
       System.err.println("        Filename: JsonFile to Process")
       System.err.println("        ESServer: Elasticsearch Server Name or IP")
       System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")

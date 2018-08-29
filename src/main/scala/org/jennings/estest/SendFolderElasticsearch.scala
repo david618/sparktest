@@ -12,7 +12,7 @@ object SendFolderElasticsearch {
 
   // spark-submit --class org.jennings.estest.SendFileElasticsearch target/estest.jar planes00001 a1 9200 local[16] planes/planes
 
-  // java -cp target/estest.jar org.jennings.estest.SendFileElasticsearchFile
+  // java -cp target/estest.jar org.jennings.estest.SendFolderElasticsearch
 
   def main(args: Array[String]): Unit = {
 
