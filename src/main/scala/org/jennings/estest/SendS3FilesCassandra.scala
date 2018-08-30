@@ -1,27 +1,66 @@
 package org.jennings.estest
 
+
 import java.util.UUID
 
+import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
+import com.amazonaws.regions.Regions
+import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.model.S3ObjectSummary
 import com.datastax.driver.core.ConsistencyLevel
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.fasterxml.jackson.dataformat.csv.{CsvMapper, CsvParser, CsvSchema}
 import org.apache.commons.logging.LogFactory
 import org.apache.spark.{SparkConf, SparkContext}
+import org.elasticsearch.spark.rdd.EsSpark
 
+import scala.collection.JavaConversions._
 import scala.util.Random
 
-object SendFileCassandra {
+
+object SendS3FilesCassandra {
+
   private val log = LogFactory.getLog(this.getClass)
+
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length < 7) {
-      System.err.println("Usage: SendFileCassandra [Filename] [cassandraHost] [replicationFactor] [recreateTable] [useSolr] [storeGeo] [Spark Master]")
+    TestLogging.setStreamingLogLevels()
+
+    val appName = getClass.getName
+
+    val numargs = args.length
+
+    if (numargs != 10) {
+      System.err.println("Usage: SendS3FilesCassandra [access-key] [secret-key] [bucket] [files] [cassandraHost] [replicationFactor] [recreateTable] [useSolr] [storeGeo] [Spark Master] ")
+      System.err.println("        access-key: aws access key")
+      System.err.println("        secret-key: aws secret key")
+      System.err.println("        bucket: Bucket to List")
+      System.err.println("        files: File Pattern")
+      System.err.println("        cassandraHost: Cassandra Server Name or IP")
+      System.err.println("        replicationFactor: Cassandra Replication Factor")
+      System.err.println("        recreateTable: Delete and create table")
+      System.err.println("        useSolr: Add Search Index")
+      System.err.println("        storeGeo: Convert Lat/Lon into Geometry")
+      System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
+
       System.exit(1)
+
     }
 
-    val Array(filename, cassandraHost, replicationFactor, recreateTable, useSolr, storeGeo, sparkMaster) = args
+    val accessKey = args(0)
+    val secretKey = args(1)
+    val bucket_name = args(2)
+    val pattern = args(3)
+    val cassandraHost = args(4)
+    val replicationFactor = args(5)
+    val recreateTable = args(6)
+    val useSolr = args(7)
+    val storeGeo = args(8)
+    val spkMaster = args(9)
+
+
 
     // configuration
     val sConf = new SparkConf(true)
@@ -116,44 +155,56 @@ object SendFileCassandra {
     log.info("Done initialization, ready to start streaming...")
     println("Done initialization, ready to start streaming...")
 
-
-    val sc = new SparkContext(sparkMaster, "SendFileCassandra", sConf)
-
-
-//    val textFile = sc.textFile(filename)
-//
-//    println(textFile.count())
-    //textFile.take(3).foreach(println)
+    // Hardcoded to US_EAST_1 for now
+    val awsCreds = new BasicAWSCredentials(accessKey, secretKey)
+    val s3Client = AmazonS3ClientBuilder.standard
+      .withCredentials(new AWSStaticCredentialsProvider(awsCreds))
+      .withRegion(Regions.US_EAST_1)
+      .build
 
 
-    val textFile = sc.textFile(filename).map(line => adaptSpecific(line))
+    val sc = new SparkContext(spkMaster, "SendFileCassandra", sConf)
 
 
-    textFile.saveToCassandra(
-      keyspace,
-      table,
-      SomeColumns(
-        "id",
-        "ts",
-        "speed",
-        "dist",
-        "bearing",
-        "rtid",
-        "orig",
-        "dest",
-        "secstodep",
-        "lon",
-        "lat",
-        "geometry"
+    sc.hadoopConfiguration.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+    sc.hadoopConfiguration.set("fs.s3a.access.key", accessKey)
+    sc.hadoopConfiguration.set("fs.s3a.secret.key", secretKey)
+    sc.hadoopConfiguration.setInt("fs.s3a.connection.maximum",5000)
+
+    val ol = s3Client.listObjects(bucket_name)
+    val objects = ol.getObjectSummaries.filter(_.getKey().matches(pattern))
+
+
+    for (os:S3ObjectSummary <- objects) {
+      System.out.println("Processing " + os.getKey)
+
+      val textFile = sc.textFile("s3a://" + bucket_name + "/" + os.getKey).map(line => adaptSpecific(line))
+
+
+      textFile.saveToCassandra(
+        keyspace,
+        table,
+        SomeColumns(
+          "id",
+          "ts",
+          "speed",
+          "dist",
+          "bearing",
+          "rtid",
+          "orig",
+          "dest",
+          "secstodep",
+          "lon",
+          "lat",
+          "geometry"
+        )
       )
-    )
 
-
+    }
 
 
 
   }
-
 
   // used to generate a random uuid
   private val RANDOM = new Random()
@@ -202,4 +253,6 @@ object SendFileCassandra {
     //println(data)
     data
   }
+
+
 }

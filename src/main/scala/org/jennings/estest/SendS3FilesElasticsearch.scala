@@ -22,7 +22,7 @@ object SendS3FilesElasticsearch {
     val numargs = args.length
 
     if (numargs != 8 && numargs != 10) {
-      System.err.println("Usage: FilesAws access-key secret-key bucket files ESServer ESPort SpkMaster IndexType Username Password")
+      System.err.println("Usage: SendS3FilesElasticsearch [access-key] [secret-key] [bucket] [files] [ESServer] [ESPort] [SpkMaster] [IndexType] [Username] [Password]")
       System.err.println("        access-key: aws access key")
       System.err.println("        secret-key: aws secret key")
       System.err.println("        bucket: Bucket to List")
