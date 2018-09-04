@@ -29,7 +29,7 @@ object SendFolderCassandra {
 
     if (numargs != 7) {
       System.err.println("Usage: SendFolderCassandra foldername [cassandraHost] [replicationFactor] [recreateTable] [useSolr] [storeGeo] [Spark Master] ")
-      System.err.println("        foldername: File Pattern")
+      System.err.println("        foldername: All files in this folder will be loaded.")
       System.err.println("        cassandraHost: Cassandra Server Name or IP")
       System.err.println("        replicationFactor: Cassandra Replication Factor")
       System.err.println("        recreateTable: Delete and create table")
@@ -218,7 +218,8 @@ object SendFolderCassandra {
     val row = rows.nextValue()
 
     val id = row(0).toLong              // Use planes00001 with 1 million unique id's 0 to 999,999.
-    val ts = System.currentTimeMillis();  // Current time im ms from epoch; With 1,000,000 unique id's the combination of id/ts will unique even for rates of several 100 million per second
+    //val ts = System.currentTimeMillis();  // Current time im ms from epoch; With 1,000,000 unique id's the combination of id/ts will unique even for rates of several 100 million per second
+    val ts = row(1).toLong 
     val speed = row(2).toDouble
     val dist = row(3).toDouble
     val bearing = row(4).toDouble
