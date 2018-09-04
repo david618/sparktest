@@ -1,12 +1,8 @@
 package org.jennings.estest
 
-
+import java.io.File
 import java.util.UUID
 
-import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
-import com.amazonaws.regions.Regions
-import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import com.amazonaws.services.s3.model.S3ObjectSummary
 import com.datastax.driver.core.ConsistencyLevel
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql.CassandraConnector
@@ -14,11 +10,11 @@ import com.fasterxml.jackson.dataformat.csv.{CsvMapper, CsvParser, CsvSchema}
 import org.apache.commons.logging.LogFactory
 import org.apache.spark.{SparkConf, SparkContext}
 
-import scala.collection.JavaConversions._
+
 import scala.util.Random
 
+object SendFolderCassandra {
 
-object SendS3FilesCassandra {
 
   private val log = LogFactory.getLog(this.getClass)
 
@@ -31,12 +27,9 @@ object SendS3FilesCassandra {
 
     val numargs = args.length
 
-    if (numargs != 10) {
-      System.err.println("Usage: SendS3FilesCassandra [access-key] [secret-key] [bucket] [files] [cassandraHost] [replicationFactor] [recreateTable] [useSolr] [storeGeo] [Spark Master] ")
-      System.err.println("        access-key: aws access key")
-      System.err.println("        secret-key: aws secret key")
-      System.err.println("        bucket: Bucket to List")
-      System.err.println("        files: File Pattern")
+    if (numargs != 7) {
+      System.err.println("Usage: SendFolderCassandra foldername [cassandraHost] [replicationFactor] [recreateTable] [useSolr] [storeGeo] [Spark Master] ")
+      System.err.println("        foldername: File Pattern")
       System.err.println("        cassandraHost: Cassandra Server Name or IP")
       System.err.println("        replicationFactor: Cassandra Replication Factor")
       System.err.println("        recreateTable: Delete and create table")
@@ -48,16 +41,13 @@ object SendS3FilesCassandra {
 
     }
 
-    val accessKey = args(0)
-    val secretKey = args(1)
-    val bucket_name = args(2)
-    val pattern = args(3)
-    val cassandraHost = args(4)
-    val replicationFactor = args(5)
-    val recreateTable = args(6)
-    val useSolr = args(7)
-    val storeGeo = args(8)
-    val spkMaster = args(9)
+    val foldername = args(0)
+    val cassandraHost = args(1)
+    val replicationFactor = args(2)
+    val recreateTable = args(3)
+    val useSolr = args(4)
+    val storeGeo = args(5)
+    val spkMaster = args(6)
 
 
 
@@ -154,54 +144,47 @@ object SendS3FilesCassandra {
     log.info("Done initialization, ready to start streaming...")
     println("Done initialization, ready to start streaming...")
 
-    // Hardcoded to US_EAST_1 for now
-    val awsCreds = new BasicAWSCredentials(accessKey, secretKey)
-    val s3Client = AmazonS3ClientBuilder.standard
-      .withCredentials(new AWSStaticCredentialsProvider(awsCreds))
-      .withRegion(Regions.US_EAST_1)
-      .build
 
 
     val sc = new SparkContext(spkMaster, "SendFileCassandra", sConf)
 
+    val folder = new File(foldername)
 
-    sc.hadoopConfiguration.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-    sc.hadoopConfiguration.set("fs.s3a.access.key", accessKey)
-    sc.hadoopConfiguration.set("fs.s3a.secret.key", secretKey)
-    sc.hadoopConfiguration.setInt("fs.s3a.connection.maximum",5000)
+    val fileArray = folder.list()
 
-    val ol = s3Client.listObjects(bucket_name)
-    val objects = ol.getObjectSummaries.filter(_.getKey().matches(pattern))
+    if (fileArray == null) {
+      println("No files in %s".format(folder))
+    } else {
+      val files = fileArray.sortWith(_ < _).iterator
 
+      while (files.hasNext) {
+        // For each file in the folder
+        val file = files.next
+        println(file)
+        val filename = foldername + File.separator + file
+        val textFile =  sc.textFile(filename).map(line => adaptSpecific(line))
 
-    for (os:S3ObjectSummary <- objects) {
-      System.out.println("Processing " + os.getKey)
-
-      val textFile = sc.textFile("s3a://" + bucket_name + "/" + os.getKey).map(line => adaptSpecific(line))
-
-
-      textFile.saveToCassandra(
-        keyspace,
-        table,
-        SomeColumns(
-          "id",
-          "ts",
-          "speed",
-          "dist",
-          "bearing",
-          "rtid",
-          "orig",
-          "dest",
-          "secstodep",
-          "lon",
-          "lat",
-          "geometry"
+        textFile.saveToCassandra(
+          keyspace,
+          table,
+          SomeColumns(
+            "id",
+            "ts",
+            "speed",
+            "dist",
+            "bearing",
+            "rtid",
+            "orig",
+            "dest",
+            "secstodep",
+            "lon",
+            "lat",
+            "geometry"
+          )
         )
-      )
 
+      }
     }
-
-
 
   }
 
