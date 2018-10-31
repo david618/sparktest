@@ -14,9 +14,51 @@ import org.elasticsearch.spark.rdd.EsSpark
   */
 object KafkaTopicCount {
 
-  // spark-submit --class org.jennings.sparktest.SendKafkaTopicElasticsearch target/sparktest.jar
 
-  // java -cp target/sparktest.jar org.jennings.estest.SendKafkaTopicElasticsearch
+  /*
+
+  This works nicely you can watch the output on the screen.  You have to pre-deploy the jar file to each of the Spark workers
+
+  /opt/spark/bin/spark-submit \
+  --master spark://10.0.128.13:7077 \
+  --conf spark.executor.extraClassPath="/home/spark/sparktest-jar-with-dependencies.jar" \
+  --driver-class-path "/home/spark/sparktest-jar-with-dependencies.jar" \
+  --conf spark.driver.extraJavaOptions=-Dlog4j.configurationFile=/home/spark/log4j2conf.xml \
+  --conf spark.executor.extraJavaOptions=-Dlog4j.configurationFile=/home/spark/log4j2conf.xml \
+  --conf spark.executor.memory=4000m \
+  --conf spark.executor.cores=4 \
+  --conf spark.cores.max=48 \
+  --conf spark.streaming.concurrentJobs=64 \
+  --conf spark.scheduler.mode=FAIR \
+  --conf spark.locality.wait=0s \
+  --conf spark.streaming.kafka.consumer.cache.enabled=false \
+  --conf spark.cassandra.output.batch.size.rows=auto \
+  --conf spark.cassandra.output.concurrent.writes=200 \
+  --class org.jennings.estest.KafkaTopicCount \
+  /home/spark/sparktest-jar-with-dependencies.jar broker.hub-gw01.l4lb.thisdcos.directory:9092 planes spark://10.0.128.13:7077 1
+
+
+   */
+
+
+  /*
+
+  This uses all the resources of the Spark cluster; it works but you'll need to access the Spark UI to see what's going on.  You can tunnel to the
+  Spark master port 8080 or 8081 (I deployed on a DC/OS master and 8080 was already used so Spark automatically started on 8081).  Tunneling
+  doesn't work great; many of the links in the web ui are reference the spark workers and don't work.  Better solution is to install XWindows on
+  one of the cluster nodes and access the Spark Web UI via that node. (e.g. VNC).
+
+
+  /opt/spark/bin/spark-submit \
+  --class org.jennings.estest.KafkaTopicCount \
+  --master spark://10.0.128.13:7077 \
+  --deploy-mode cluster http://10.0.128.17/sparktest-jar-with-dependencies.jar broker.hub-gw01.l4lb.thisdcos.directory:9092 planes spark://10.0.128.13:7077 1
+
+
+
+
+   */
+
 
   def main(args: Array[String]): Unit = {
 
@@ -75,6 +117,8 @@ object KafkaTopicCount {
 
       val tsRDD = rdd.map(_.value)
       cnt += tsRDD.count()
+
+
 
       println(cnt)
     }
