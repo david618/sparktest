@@ -15,7 +15,7 @@ import org.apache.spark.{SparkConf, SparkContext}
   *  The following didn't work....
   * ./spark/bin/spark-submit   --class org.jennings.estest.SendFileKafka
   *     --master spark://10.0.128.13:7077
-  *     --deploy-mode cluster http://10.0.128.17/sparktest-jar-with-dependencies.jar org.jennings.estest.SendFileKafka /home/spark/planes00001 broker.hub-gw01.l4lb.thisdcos.directory:9092 planes -
+  *     --deploy-mode cluster http://10.0.128.17/sparktest-jar-with-dependencies.jar /home/spark/planes00001 broker.hub-gw01.l4lb.thisdcos.directory:9092 planes -
   *
   *
   *
@@ -30,12 +30,13 @@ object SendFileKafka {
 
     val numargs = args.length
 
-    if (numargs != 4) {
-      System.err.println("Usage: SendFileKafka Filename Brokers Topic SpkMaster")
+    if (numargs != 5) {
+      System.err.println("Usage: SendFileKafka Filename Brokers Topic SpkMaster NumTimesSendFile")
       System.err.println("        Filename: JsonFile to Process")
       System.err.println("        Brokers: CSV list of Kafka Brokers")
       System.err.println("        Topic: Kafka Topic")
       System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
+      System.err.println("        NumTimesSendFile: Number of Times to Send the File")
       System.exit(1)
 
     }
@@ -44,10 +45,7 @@ object SendFileKafka {
     val brokers = args(1)
     val topic = args(2)
     val spkMaster = args(3)
-
-    //val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
-
-    println("Sending " + filename + " to " + brokers + ":" + topic + " using " + spkMaster)
+    val numTimesSend = args(4)
 
     val sparkConf = new SparkConf().setAppName(appName)
     sparkConf.set("spark.port.maxRetries", "50")
@@ -57,6 +55,7 @@ object SendFileKafka {
       sparkConf.setMaster(spkMaster)
     }
 
+    println("Sending " + filename + " " + numTimesSend + " times to " + brokers + ":" + topic + " using " + spkMaster)
 
     val sc = new SparkContext(sparkConf)
 
@@ -85,13 +84,15 @@ object SendFileKafka {
 
     val kafkaSink = sc.broadcast(KafkaSink(props))
 
-    textFile.foreach { line =>
+    for ( i <- 1 to numTimesSend.toInt ) {
 
-      val uuid = UUID.randomUUID
-      kafkaSink.value.send(topic, uuid.toString, line)
+      textFile.foreach { line =>
 
+        val uuid = UUID.randomUUID
+        kafkaSink.value.send(topic, uuid.toString, line)
+
+      }
     }
-
 
 
 
