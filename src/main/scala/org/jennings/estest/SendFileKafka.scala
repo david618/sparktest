@@ -2,11 +2,23 @@ package org.jennings.estest
 
 import java.util.{Properties, UUID}
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
-  * Created by david on 11/4/17.
+  * Created by david on 11/2/2018.
+  *
+  * java -cp target/sparktest.jar org.jennings.estest.SendFileKafka /home/centos/rttest/planes00001 broker.hub-gw01.l4lb.thisdcos.directory:9092 planes -
+  *
+  *
+  *  The following didn't work....
+  * ./spark/bin/spark-submit   --class org.jennings.estest.SendFileKafka
+  *     --master spark://10.0.128.13:7077
+  *     --deploy-mode cluster http://10.0.128.17/sparktest-jar-with-dependencies.jar org.jennings.estest.SendFileKafka /home/spark/planes00001 broker.hub-gw01.l4lb.thisdcos.directory:9092 planes -
+  *
+  *
+  *
   */
 object SendFileKafka {
 
@@ -47,6 +59,11 @@ object SendFileKafka {
 
 
     val sc = new SparkContext(sparkConf)
+
+    // These lines added; otherwise the big jar fails with error "No FileSystem for scheme: file"
+    val hadoopConfig: Configuration = sc.hadoopConfiguration
+    hadoopConfig.set("fs.hdfs.impl", classOf[org.apache.hadoop.hdfs.DistributedFileSystem].getName)
+    hadoopConfig.set("fs.file.impl", classOf[org.apache.hadoop.fs.LocalFileSystem].getName)
 
     val textFile = sc.textFile(filename)
 
