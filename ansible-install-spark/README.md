@@ -42,6 +42,11 @@ Stop:  ```ansible-playbook --private-key /home/azureuser/az -i hosts playbooks/s
   
 ## Copy sparktest to Spark Workers
 
+On the bastion host clone this repo and build sparktest.
+
+Then run this ansible command to copy sparktest jar to all the workers.
+
+
 
 ## Submit Job to Spark
 
