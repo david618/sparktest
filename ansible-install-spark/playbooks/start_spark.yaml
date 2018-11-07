@@ -1,0 +1,25 @@
+---
+
+- hosts: master 
+  vars:
+    sudouser: "{{ ansible_env['SUDO_USER'] }}"
+  become: true
+
+  tasks:
+  - name: Run Masters
+    become_user: spark
+    command: "/opt/spark/sbin/start-master.sh"
+
+- hosts: slave
+  vars:
+    sudouser: "{{ ansible_env['SUDO_USER'] }}"
+    masterip: "{{ hostvars[groups['master'][0]]['ansible_default_ipv4']['address'] }}"
+  become: true
+
+  tasks:
+  - name: Run Slaves
+    become_user: spark
+    command: "/opt/spark/sbin/start-slave.sh spark://{{ masterip }}:7077"
+
+
+   

@@ -1,0 +1,20 @@
+---
+- hosts: spark
+  vars:
+    sudouser: "{{ ansible_env['SUDO_USER'] }}"
+  become: true
+
+  tasks:
+  - name: Copy sparktest jar to spark nodes
+    copy:
+      src: /home/centos/sparktest/target/sparktest-jar-with-dependencies.jar
+      dest: /home/spark/sparktest-jar-with-dependencies.jar
+      owner: spark
+      group: spark
+
+  - name: Copy Spark Bundle to Spark Nodes
+    copy:
+      src: /home/centos/log4j2conf.xml
+      dest: /home/spark/log4j2conf.xml
+      owner: spark
+      group: spark

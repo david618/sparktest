@@ -1,0 +1,24 @@
+---
+
+- hosts: master 
+  vars:
+    sudouser: "{{ ansible_env['SUDO_USER'] }}"
+  become: true
+
+  tasks:
+  - name: Stop Masters
+    become_user: spark
+    command: "/opt/spark/sbin/stop-master.sh"
+
+- hosts: slave
+  vars:
+    sudouser: "{{ ansible_env['SUDO_USER'] }}"
+  become: true
+
+  tasks:
+  - name: Stop Slaves
+    become_user: spark
+    command: "/opt/spark/sbin/stop-slave.sh"
+
+
+   

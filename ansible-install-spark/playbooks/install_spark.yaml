@@ -1,0 +1,60 @@
+---
+- hosts: bastion
+  vars:
+    sudouser: "{{ ansible_env['SUDO_USER'] }}"
+  become: true
+
+  tasks:
+  - name: Get Spark Bundle From Internet
+    get_url:
+      url: https://apache.org/dist/spark/spark-2.3.2/spark-2.3.2-bin-hadoop2.7.tgz
+      dest: /tmp/spark-2.3.2-bin-hadoop2.7.tgz
+      checksum: sha512:E61D9330125746A24D7784166A15B41514546CAD874357C98DCA0A2C39FA7303D8FA7C049BA6CDF5A24C172D4F47A2E5B6E1F658A57A9B2A30D46D9858CDB531
+
+
+- hosts: spark 
+  vars:
+    sudouser: "{{ ansible_env['SUDO_USER'] }}"
+  become: true
+
+  tasks:
+  - name: Install Java
+    yum:
+      name: java-1.8.0-openjdk
+      state: present
+
+  - name: Copy Spark Bundle to Spark Nodes
+    copy:
+      src: /tmp/spark-2.3.2-bin-hadoop2.7.tgz
+      dest: /tmp/spark-2.3.2-bin-hadoop2.7.tgz
+
+  - name: Create Spark User
+    user:
+      name: spark
+      system: yes
+
+  - name: Create Spark Folder /opt/spark
+    file:
+      path: /opt/spark
+      state: directory
+
+  - name: Unarchive Spark Bundle
+    unarchive:
+      src: /tmp/spark-2.3.2-bin-hadoop2.7.tgz
+      dest: /opt/spark
+      extra_opts: [--strip-components=1]
+
+  - name: Copy log4j.properties to config
+    copy:
+      src: ../files/log4j.properties
+      dest: /opt/spark/conf/log4j.properties
+
+  - name: Change Owner/Perms /opt/spark
+    file:
+      path: /opt/spark
+      state: directory
+      owner: spark
+      group: spark
+      mode: 0775
+      recurse: yes
+
