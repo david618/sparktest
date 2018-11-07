@@ -19,27 +19,29 @@ import org.apache.spark.{SparkConf, SparkContext}
   *
   * This worked; had to preposition the jar file and planes00001
   *
-  * /opt/spark/bin/spark-submit \
-  * --master spark://10.0.128.13:7077 \
-  * --conf spark.executor.extraClassPath="/home/spark/sparktest-jar-with-dependencies.jar" \
-  * --driver-class-path "/home/spark/sparktest-jar-with-dependencies.jar" \
-  * --conf spark.driver.extraJavaOptions=-Dlog4j.configurationFile=/home/spark/log4j2conf.xml \
-  * --conf spark.executor.extraJavaOptions=-Dlog4j.configurationFile=/home/spark/log4j2conf.xml \
-  * --conf spark.executor.memory=4000m \
-  * --conf spark.executor.cores=4 \
-  * --conf spark.cores.max=48 \
-  * --conf spark.streaming.concurrentJobs=64 \
-  * --conf spark.scheduler.mode=FAIR \
-  * --conf spark.locality.wait=0s \
-  * --conf spark.streaming.kafka.consumer.cache.enabled=false \
-  * --conf spark.cassandra.output.batch.size.rows=auto \
-  * --conf spark.cassandra.output.concurrent.writes=200 \
-  * --class org.jennings.estest.SendFileKafka \
-  * /home/spark/sparktest-jar-with-dependencies.jar /home/spark/planes00001 broker.hub-gw01.l4lb.thisdcos.directory:9092 planes - 10
-  *
-  *
   *
   */
+
+/*
+  /opt/spark/bin/spark-submit \
+  --master spark://10.0.128.13:7077 \
+  --conf spark.executor.extraClassPath="/home/spark/sparktest-jar-with-dependencies.jar" \
+  --driver-class-path "/home/spark/sparktest-jar-with-dependencies.jar" \
+  --conf spark.driver.extraJavaOptions=-Dlog4j.configurationFile=/home/spark/log4j2conf.xml \
+  --conf spark.executor.extraJavaOptions=-Dlog4j.configurationFile=/home/spark/log4j2conf.xml \
+  --conf spark.executor.memory=4000m \
+  --conf spark.executor.cores=4 \
+  --conf spark.cores.max=48 \
+  --conf spark.streaming.concurrentJobs=64 \
+  --conf spark.scheduler.mode=FAIR \
+  --conf spark.locality.wait=0s \
+  --conf spark.streaming.kafka.consumer.cache.enabled=false \
+  --conf spark.cassandra.output.batch.size.rows=auto \
+  --conf spark.cassandra.output.concurrent.writes=200 \
+  --class org.jennings.estest.SendFileKafka \
+  /home/spark/sparktest-jar-with-dependencies.jar /home/spark/planes00001 broker.hub-gw01.l4lb.thisdcos.directory:9092 planes - 10
+ */
+
 object SendFileKafka {
 
   def main(args: Array[String]): Unit = {

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+  <Appenders>
+    <Console name="Console">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Logger name="org.apache" level="error">
+        <AppenderRef ref="Console"/>
+    </Logger>
+    <Logger name="org.spark_project" level="error">
+        <AppenderRef ref="Console"/>
+    </Logger>
+    <Logger name="org.elasticsearch" level="error">
+        <AppenderRef ref="Console"/>
+    </Logger>
+    <Logger name="org.I0Itec" level="error">
+        <AppenderRef ref="Console"/>
+    </Logger>
+    <Root level="info">
+      <AppenderRef ref="Console"/>
+    </Root>
+  </Loggers>
+</Configuration>
