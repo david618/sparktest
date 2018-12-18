@@ -31,7 +31,7 @@ object SendS3FilesCassandra {
 
     val numargs = args.length
 
-    if (numargs != 10) {
+    if (numargs != 10 && numargs != 9) {
       System.err.println("Usage: SendS3FilesCassandra [access-key] [secret-key] [bucket] [files] [cassandraHost] [replicationFactor] [recreateTable] [useSolr] [storeGeo] [Spark Master] ")
       System.err.println("        access-key: aws access key")
       System.err.println("        secret-key: aws secret key")
@@ -42,7 +42,7 @@ object SendS3FilesCassandra {
       System.err.println("        recreateTable: Delete and create table")
       System.err.println("        useSolr: Add Search Index")
       System.err.println("        storeGeo: Convert Lat/Lon into Geometry")
-      System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
+      System.err.println("        SpkMaster: Spark Master (e.g. local[8]; leave blank to use --master in spark-submit)")
 
       System.exit(1)
 
@@ -57,8 +57,11 @@ object SendS3FilesCassandra {
     val recreateTable = args(6)
     val useSolr = args(7)
     val storeGeo = args(8)
-    val spkMaster = args(9)
-
+    val spkMaster = if (numargs == 10) {
+      args(9)
+    } else {
+      ""
+    }
 
 
     // configuration
@@ -66,6 +69,10 @@ object SendS3FilesCassandra {
       .set("spark.cassandra.connection.host", cassandraHost)
       .set("spark.cassandra.output.consistency.level", ConsistencyLevel.ONE.toString)
       .setAppName(getClass.getSimpleName)
+
+    if (numargs == 10) {
+      sConf.setMaster(spkMaster)
+    }
 
     val keyspace = "realtime"
     val table = "planes"
@@ -162,7 +169,7 @@ object SendS3FilesCassandra {
       .build
 
 
-    val sc = new SparkContext(spkMaster, "SendFileCassandra", sConf)
+    val sc = new SparkContext(sConf)
 
 
     sc.hadoopConfiguration.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
@@ -235,7 +242,7 @@ object SendS3FilesCassandra {
     val row = rows.nextValue()
 
     val id = row(0).toLong              // Use planes00001 with 1 million unique id's 0 to 999,999.
-    val ts = System.currentTimeMillis();  // Current time im ms from epoch; With 1,000,000 unique id's the combination of id/ts will unique even for rates of several 100 million per second
+    val ts = System.currentTimeMillis()  // Current time im ms from epoch; With 1,000,000 unique id's the combination of id/ts will unique even for rates of several 100 million per second
     val speed = row(2).toDouble
     val dist = row(3).toDouble
     val bearing = row(4).toDouble
