@@ -242,7 +242,8 @@ object SendS3FilesCassandra {
     val row = rows.nextValue()
 
     val id = row(0).toLong              // Use planes00001 with 1 million unique id's 0 to 999,999.
-    val ts = System.currentTimeMillis()  // Current time im ms from epoch; With 1,000,000 unique id's the combination of id/ts will unique even for rates of several 100 million per second
+    //val ts = System.currentTimeMillis()  // Current time im ms from epoch; With 1,000,000 unique id's the combination of id/ts will unique even for rates of several 100 million per second
+    val ts = row(1).toLong
     val speed = row(2).toDouble
     val dist = row(3).toDouble
     val bearing = row(4).toDouble

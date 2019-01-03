@@ -25,12 +25,26 @@ object SendKafkaTopicCassandra {
 
     if (args.length < 11) {
       System.err.println("Usage: SendKafkaTopicCassandra <sparkMaster> <emitIntervalInMillis>" +
-        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug>")
+        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> (<latest = true>)")
       System.exit(1)
     }
 
-    val Array(sparkMaster, emitInterval, kBrokers, kConsumerGroup, kTopics, kThreads, kCassandraHost, kReplicationFactor, recreateTable, storeGeo, kDebug) = args
-    val useSolr = storeGeo.toBoolean
+    val sparkMaster = args(0)
+    val emitInterval = args(1)
+    val kBrokers = args(2)
+    val kConsumerGroup = args(3)
+    val kTopics = args(4)
+    val kThreads = args(5)
+    val kCassandraHost = args(6)
+    val kReplicationFactor = args(7)
+    val recreateTable = args(8).toBoolean
+    val storeGeo = args(9).toBoolean
+    val kDebug = args(10).toBoolean
+    // default latest to true
+    val kLatest = if (args.length >= 11) args(11).toBoolean else true
+
+
+    val useSolr = storeGeo
     println("Using Solr ? " + useSolr)
 
     // configuration
@@ -45,7 +59,7 @@ object SendKafkaTopicCassandra {
     val table = "planes"
 
     // check if need to recreate the tables
-    if (recreateTable.toBoolean) {
+    if (recreateTable) {
       log.info(s"We are recreating the table: $keyspace.$table")
       println(s"We are recreating the table: $keyspace.$table")
       CassandraConnector(sConf).withSessionDo {
@@ -99,7 +113,7 @@ object SendKafkaTopicCassandra {
             )
 
             // check if we want to store the Geo
-            if (storeGeo.toBoolean) {
+            if (storeGeo) {
               // enable search on geometry field
               session.execute(
                 s"""
@@ -135,14 +149,17 @@ object SendKafkaTopicCassandra {
     // the streaming context
     val ssc = new StreamingContext(sc, Milliseconds(emitInterval.toInt))
 
+    // resetToSt
+    val resetToStr = if (kLatest) "latest" else "earliest"
+
     // create the kafka stream
-    val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt)
+    val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
     // very specific adaptation for performance
     val dataStream = stream.map(line => adaptSpecific(line))
 
     // debug
-    if (kDebug.toBoolean) {
+    if (kDebug) {
       dataStream.foreachRDD {
         (rdd, time) =>
           val count = rdd.count()
@@ -187,13 +204,13 @@ object SendKafkaTopicCassandra {
   }
 
   // create the kafka stream
-  private def createKafkaStream(ssc: StreamingContext, brokers: String, consumerGroup: String, topics: String, numOfThreads: Int = 1): DStream[String] = {
+  private def createKafkaStream(ssc: StreamingContext, brokers: String, consumerGroup: String, topics: String, numOfThreads: Int = 1, resetToStr: String): DStream[String] = {
     val kafkaParams = Map[String, Object](
       "bootstrap.servers" -> brokers,
       "key.deserializer" -> classOf[StringDeserializer],
       "value.deserializer" -> classOf[StringDeserializer],
       "group.id" -> consumerGroup,
-      "auto.offset.reset" -> "latest",
+      "auto.offset.reset" -> resetToStr,
       "enable.auto.commit" -> (false: java.lang.Boolean)
     )
     val topicMap = topics.split(",")
