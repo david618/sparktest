@@ -25,7 +25,7 @@ object SendKafkaTopicCassandra {
 
     if (args.length < 11) {
       System.err.println("Usage: SendKafkaTopicCassandra <sparkMaster> <emitIntervalInMillis>" +
-        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> (<latest = true>)")
+        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> (<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
 
@@ -42,6 +42,8 @@ object SendKafkaTopicCassandra {
     val kDebug = args(10).toBoolean
     // default latest to true
     val kLatest = if (args.length > 11) args(11).toBoolean else true
+    val kKeyspace = if (args.length > 12) args(12) else "realtime"
+    val kTable = if (args.length > 13) args(13) else "planes"
 
 
     val useSolr = storeGeo
@@ -55,8 +57,8 @@ object SendKafkaTopicCassandra {
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
 
-    val keyspace = "realtime"
-    val table = "planes"
+    val keyspace = kKeyspace
+    val table = kTable
 
     // check if need to recreate the tables
     if (recreateTable) {
