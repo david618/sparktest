@@ -41,7 +41,7 @@ object SendKafkaTopicCassandra {
     val storeGeo = args(9).toBoolean
     val kDebug = args(10).toBoolean
     // default latest to true
-    val kLatest = if (args.length >= 11) args(11).toBoolean else true
+    val kLatest = if (args.length > 11) args(11).toBoolean else true
 
 
     val useSolr = storeGeo
