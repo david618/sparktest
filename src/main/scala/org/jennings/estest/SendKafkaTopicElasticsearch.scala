@@ -81,8 +81,8 @@ object SendKafkaTopicElasticsearch {
 
     // parse arguments
     //val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
-    val broker = args(0)
-    val topic = args(1)
+    val kBrokers = args(0)
+    val kTopics = args(1)
     val esServer = args(2)
     val esPort = args(3)
     val spkMaster = args(4)
@@ -99,13 +99,11 @@ object SendKafkaTopicElasticsearch {
 
     //TODO - kafka arguments...
     val kDebug = args(11).toBoolean
-    val kBrokers = args(12)
     val kConsumerGroup = args(13)
-    val kTopics = args(14)
     val kThreads = args(15)
     val kLatest = if (args.length > 16) args(16).toBoolean else true
 
-    println("Sending " + topic + " to " + esServer + ":" + esPort + " using " + spkMaster)
+    println("Sending " + kTopics + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
     createIndex(esServer, esPort, username, password, indexName, recreateIndex, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
 
@@ -129,7 +127,7 @@ object SendKafkaTopicElasticsearch {
     }
 
     val kafkaParams = Map[String, Object](
-      "bootstrap.servers" -> broker,
+      "bootstrap.servers" -> kBrokers,
       "key.deserializer" -> classOf[StringDeserializer],
       "value.deserializer" -> classOf[StringDeserializer],
       "group.id" -> java.util.UUID.randomUUID().toString(),
@@ -138,7 +136,7 @@ object SendKafkaTopicElasticsearch {
     )
 
 
-    val topics = Array(topic)
+    val topics = Array(kTopics)
 
     val sc = new SparkContext(sparkConf)
 
@@ -169,7 +167,7 @@ object SendKafkaTopicElasticsearch {
 
     dataStream.foreachRDD { rdd =>
       //val tsRDD = rdd.map(_.value)
-      EsSpark.saveJsonToEs(rdd, indexName)
+      EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
     }
 
     log.info("Stream is starting now...")
