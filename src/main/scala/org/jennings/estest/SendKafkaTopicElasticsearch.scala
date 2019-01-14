@@ -1,14 +1,18 @@
 package org.jennings.estest
 
 import java.net.URL
+import java.util.UUID
 
+import com.fasterxml.jackson.dataformat.csv.{CsvMapper, CsvParser, CsvSchema}
 import org.apache.commons.codec.binary.Base64
+import org.apache.commons.logging.LogFactory
 import org.apache.http.client.methods.{CloseableHttpResponse, HttpDelete, HttpPut, HttpRequestBase, HttpUriRequest}
 import org.apache.http.entity.{ContentType, StringEntity}
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.util.EntityUtils
 import org.apache.http.{HttpHeaders, HttpStatus}
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
 import org.apache.spark.streaming.kafka010.KafkaUtils
 import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
@@ -16,17 +20,37 @@ import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.elasticsearch.spark.rdd.EsSpark
 
+import scala.util.Random
+
 
 object SendKafkaTopicElasticsearch {
+
+  private val log = LogFactory.getLog(this.getClass)
+
+  // used to generate a random uuid
+  private val RANDOM = new Random()
 
   val DEFAULT_TYPE_NAME = "_doc"
 
   // TODO - make these arguments?
-  val replicationFactor: Int = 0
-  val numOfShards: Int = 5
-  val refreshInterval: String = "60s"
-  val maxRecordCount: Int = 10000
+  private val replicationFactor: Int = 0
+  private val numOfShards: Int = 5
+  private val refreshInterval: String = "60s"
+  private val maxRecordCount: Int = 10000
 
+  // initialized the object mapper / text parser only once
+  private val objectMapper = {
+    // create an empty schema
+    val schema = CsvSchema.emptySchema()
+        .withColumnSeparator(',')
+        .withLineSeparator("\\n")
+    // create the mapper
+    val csvMapper = new CsvMapper()
+    csvMapper.enable(CsvParser.Feature.WRAP_AS_ARRAY)
+    csvMapper
+        .readerFor(classOf[Array[String]])
+        .`with`(schema)
+  }
 
   // spark-submit --class org.jennings.sparktest.SendKafkaTopicElasticsearch target/sparktest.jar
 
@@ -73,6 +97,14 @@ object SendKafkaTopicElasticsearch {
       }
     }
 
+    //TODO - kafka arguments...
+    val kDebug = args(11).toBoolean
+    val kBrokers = args(12)
+    val kConsumerGroup = args(13)
+    val kTopics = args(14)
+    val kThreads = args(15)
+    val kLatest = if (args.length > 16) args(16).toBoolean else true
+
     println("Sending " + topic + " to " + esServer + ":" + esPort + " using " + spkMaster)
 
     createIndex(esServer, esPort, username, password, indexName, recreateIndex, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
@@ -112,36 +144,98 @@ object SendKafkaTopicElasticsearch {
 
     val ssc = new StreamingContext(sc, Seconds(sparkStreamSeconds))
 
-    val stream = KafkaUtils.createDirectStream[String, String](
-      ssc,
-      PreferConsistent,
-      Subscribe[String, String](topics, kafkaParams)
-    )
+    // resetToSt
+    val resetToStr = if (kLatest) "latest" else "earliest"
 
-    stream.foreachRDD { rdd =>
+    // create the kafka stream
+    //val stream = KafkaUtils.createDirectStream[String, String](ssc, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
+    val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
-      //rdd.map(_.value())
+    // convert csv lines to ES JSON
+    val dataStream = stream.map(line => csvToJson(line))
 
-      val tsRDD = rdd.map(_.value)
-      EsSpark.saveJsonToEs(tsRDD, indexName)
-
-      // Error KafkaConsumer is not thread safe errors when trying the following
-
-      //      val thread = new Thread {
-      //        override def run: Unit = {
-      //          EsSpark.saveJsonToEs(tsRDD, indexAndType)
-      //        }
-      //      }
-      //      thread.start
-      //      println(rdd.count());
-      //      rdd.foreach { f =>
-      //        println(f.value())
-      //      }
+    // debug
+    if (kDebug) {
+      dataStream.foreachRDD {
+        (rdd, time) =>
+          val count = rdd.count()
+          if (count > 0) {
+            val msg = "Time %s: saving to DSE (%s total records)".format(time, count)
+            log.warn(msg)
+            println(msg)
+          }
+      }
     }
 
-    ssc.start()
+    dataStream.foreachRDD { rdd =>
+      //val tsRDD = rdd.map(_.value)
+      EsSpark.saveJsonToEs(rdd, indexName)
+    }
 
+    log.info("Stream is starting now...")
+    println("Stream is starting now...")
+
+    // start the stream
+    ssc.start
     ssc.awaitTermination()
+  }
+
+  /**
+    * Adapt to the very specific Safegraph JSON Schema
+    */
+  private def csvToJson(csvLine: String): String = {
+    val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
+
+    // parse out the line
+    val rows = objectMapper.readValues[Array[String]](csvLine)
+    val row = rows.nextValue()
+
+    val id = uuid.toString // NOTE: This is to ensure unique records
+    val ts = row(1).toLong
+    val speed = row(2).toDouble
+    val dist = row(3).toDouble
+    val bearing = row(4).toDouble
+    val rtid = row(5).toInt
+    val orig = row(6)
+    val dest = row(7)
+    val secsToDep = row(8).toInt
+    val longitude = row(9).toDouble
+    val latitude = row(10).toDouble
+
+    s"""
+       |{
+       |   "id": "$id",
+       |   "ts": $ts,
+       |   "speed": $speed,
+       |   "dist": $dist,
+       |   "bearing": $bearing,
+       |   "rtid": $rtid,
+       |   "orig": "$orig",
+       |   "dest": "$dest",
+       |   "secsToDep": $secsToDep,
+       |   "longitude": $longitude,
+       |   "latitude": $latitude,
+       |   "Geometry": [$longitude,$latitude]
+       |}
+     """.stripMargin
+  }
+
+  // create the kafka stream
+  private def createKafkaStream(ssc: StreamingContext, brokers: String, consumerGroup: String, topics: String, numOfThreads: Int = 1, resetToStr: String): DStream[String] = {
+    val kafkaParams = Map[String, Object](
+      "bootstrap.servers" -> brokers,
+      "key.deserializer" -> classOf[StringDeserializer],
+      "value.deserializer" -> classOf[StringDeserializer],
+      "group.id" -> consumerGroup,
+      "auto.offset.reset" -> resetToStr,
+      "enable.auto.commit" -> (false: java.lang.Boolean)
+    )
+    val topicMap = topics.split(",")
+    val kafkaStreams = (1 to numOfThreads).map { i =>
+      KafkaUtils.createDirectStream[String, String](ssc, PreferConsistent, Subscribe[String, String](topicMap, kafkaParams)).map(_.value())
+    }
+    val unifiedStream = ssc.union(kafkaStreams)
+    unifiedStream
   }
 
   private def deleteIndex(esServer: String, esPort: String, username: String, password: String, indexName: String): Boolean = {
