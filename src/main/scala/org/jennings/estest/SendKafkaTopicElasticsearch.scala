@@ -16,7 +16,7 @@ import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
 import org.apache.spark.streaming.kafka010.KafkaUtils
 import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.elasticsearch.spark.rdd.EsSpark
 
@@ -32,11 +32,6 @@ object SendKafkaTopicElasticsearch {
 
   val DEFAULT_TYPE_NAME = "_doc"
 
-  // TODO - make these arguments?
-  private val replicationFactor: Int = 0
-  private val numOfShards: Int = 5
-  private val refreshInterval: String = "60s"
-  private val maxRecordCount: Int = 10000
 
   // initialized the object mapper / text parser only once
   private val objectMapper = {
@@ -52,101 +47,78 @@ object SendKafkaTopicElasticsearch {
         .`with`(schema)
   }
 
-  // spark-submit --class org.jennings.sparktest.SendKafkaTopicElasticsearch target/sparktest.jar
-
-  // java -cp target/sparktest.jar org.jennings.estest.SendKafkaTopicElasticsearch
 
   def main(args: Array[String]): Unit = {
 
-    TestLogging.setStreamingLogLevels()
 
-    val appName = getClass.getName
-
-    val numargs = args.length
-
-    if (numargs != 8 && numargs != 10) {
-      System.err.println("Usage: SendKafkaTopicElasticsearch broker topic ESServer ESPort SpkMaster StreamingIntervalSec indexName recreateIndex (Username) (Password)")
-      System.err.println("        broker: Server:IP")
-      System.err.println("        topic: Kafka Topic Name")
-      System.err.println("        ESServer: Elasticsearch Server Name or IP")
-      System.err.println("        ESPort: Elasticsearch Port (e.g. 9200)")
-      System.err.println("        SpkMaster: Spark Master (e.g. local[8] or - to use default)")
-      System.err.println("        Spark Streaming Interval Seconds (e.g. 1)")
-      System.err.println("        IndexName: Index name (e.g. planes)")
-      System.err.println("        recreateIndex: whether to recreate the index")
-      System.err.println("        Username: Elasticsearch Username (optional)")
-      System.err.println("        Password: Elasticsearch Password (optional)")
+    if (args.length < 13) {
+      System.err.println("Usage: SendKafkaTopicElasticsearch [spkMaster] [emitIntervalMS] [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +
+        "[elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards] [recreateTable] [debug] (<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
 
     // parse arguments
     //val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
-    val kBrokers = args(0)
-    val kTopics = args(1)
-    val esServer = args(2)
-    val esPort = args(3)
-    val spkMaster = args(4)
-    val sparkStreamSeconds = args(4).toLong
-    val indexName = args(5)
-    val recreateIndex = args(6).toBoolean
-    val (username, password) = {
-      if (numargs == 10) {
-        (args(8), args(9))
-      } else {
-        (null, null)
-      }
+    val sparkMaster = args(0)
+    val emitInterval = args(1).toLong
+    val kBrokers = args(2)
+    val kConsumerGroup = args(3)
+    val kTopics = args(4)
+    val kThreads = args(5)
+    val esServer = args(6)
+    val esPort = args(7)
+    val esUsername = args(8)
+    val esPassword = args(9)
+    val esNumOfShards = args(10).toInt
+    val recreateIndex = args(11).toBoolean
+    val kDebug = args(12).toBoolean
+    // optional params
+    val kLatest = if (args.length > 13) args(13).toBoolean else true
+    val esIndexName = if (args.length > 14) args(14) else "planes"
+
+
+    // TODO - make these arguments?
+    val replicationFactor: Int = 0
+    val refreshInterval: String = "60s"
+    val maxRecordCount: Int = 10000
+
+
+
+    val sConf = new SparkConf(true)
+      .set("es.index.auto.create", "true")
+      .set("es.nodes", esServer)
+      .set("es.port", esPort)
+      // Without the following it would not create the index on single-node mode
+      .set("es.nodes.discovery", "false")
+      .set("es.nodes.data.only", "false")
+      // Without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
+      .set("es.nodes.wan.only", "true")
+      .setAppName(getClass.getSimpleName)
+      .set("es.net.http.auth.user", esUsername)
+      .set("es.net.http.auth.pass", esPassword)
+
+    val sc = new SparkContext(sparkMaster, "KafkaToElastic", sConf)
+
+
+
+    // The following delete and create an Elasticsearch Index; otherwise it assumes index already exists
+    if (recreateIndex) {
+      println(s"We are recreating the index: $esIndexName")
+      log.info(s"We are recreating the index: $esIndexName")
+      deleteIndex(esServer, esPort, esUsername, esPassword, esIndexName)
+      createIndex(esServer, esPort, esUsername, esPassword, esIndexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
     }
 
-    //TODO - kafka arguments...
-    val kDebug = args(11).toBoolean
-    val kConsumerGroup = args(13)
-    val kThreads = args(15)
-    val kLatest = if (args.length > 16) args(16).toBoolean else true
+    log.info("Done initialization, ready to start streaming...")
+    println("Done initialization, ready to start streaming...")
 
-    println("Sending " + kTopics + " to " + esServer + ":" + esPort + " using " + spkMaster)
-
-    createIndex(esServer, esPort, username, password, indexName, recreateIndex, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
-
-    val sparkConf = new SparkConf().setAppName(appName)
-    if (!spkMaster.equalsIgnoreCase("-")) {
-      sparkConf.setMaster(spkMaster)
-    }
-    sparkConf.set("es.index.auto.create", "true")
-    sparkConf.set("es.nodes", esServer)
-    sparkConf.set("es.port", esPort)
-    // Without the following it would not create the index on single-node mode
-    sparkConf.set("es.nodes.discovery", "false")
-    sparkConf.set("es.nodes.data.only", "false")
-    // Without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
-    sparkConf.set("es.nodes.wan.only", "true")
-
-    if (username != null && password != null) {
-      sparkConf.set("es.net.http.auth.user", args(8))
-      sparkConf.set("es.net.http.auth.pass", args(9))
-
-    }
-
-    val kafkaParams = Map[String, Object](
-      "bootstrap.servers" -> kBrokers,
-      "key.deserializer" -> classOf[StringDeserializer],
-      "value.deserializer" -> classOf[StringDeserializer],
-      "group.id" -> java.util.UUID.randomUUID().toString(),
-      "auto.offset.reset" -> "latest",
-      "enable.auto.commit" -> (false: java.lang.Boolean)
-    )
-
-
-    val topics = Array(kTopics)
-
-    val sc = new SparkContext(sparkConf)
-
-    val ssc = new StreamingContext(sc, Seconds(sparkStreamSeconds))
+    // the streaming context
+    val ssc = new StreamingContext(sc, Milliseconds(emitInterval))
 
     // resetToSt
     val resetToStr = if (kLatest) "latest" else "earliest"
 
     // create the kafka stream
-    //val stream = KafkaUtils.createDirectStream[String, String](ssc, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
     val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
     // convert csv lines to ES JSON
@@ -166,8 +138,10 @@ object SendKafkaTopicElasticsearch {
     }
 
     dataStream.foreachRDD { rdd =>
-      //val tsRDD = rdd.map(_.value)
-      EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
+//      rdd.foreach(a => {
+//        println(a)
+//      })
+      EsSpark.saveJsonToEs(rdd, s"$esIndexName/$DEFAULT_TYPE_NAME")
     }
 
     log.info("Stream is starting now...")
@@ -200,22 +174,7 @@ object SendKafkaTopicElasticsearch {
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
 
-    s"""
-       |{
-       |   "id": "$id",
-       |   "ts": $ts,
-       |   "speed": $speed,
-       |   "dist": $dist,
-       |   "bearing": $bearing,
-       |   "rtid": $rtid,
-       |   "orig": "$orig",
-       |   "dest": "$dest",
-       |   "secsToDep": $secsToDep,
-       |   "longitude": $longitude,
-       |   "latitude": $latitude,
-       |   "Geometry": [$longitude,$latitude]
-       |}
-     """.stripMargin
+    s"""{"id": "$id","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"geometry": [$longitude,$latitude]}"""
   }
 
   // create the kafka stream
@@ -261,14 +220,11 @@ object SendKafkaTopicElasticsearch {
     }
   }
 
-  private def createIndex(esServer: String, esPort: String, username: String, password: String, indexName: String, recreate: Boolean, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): Boolean = {
-    if (recreate) {
-      // delete the index
-      deleteIndex(esServer, esPort, username, password, indexName)
-    }
+  private def createIndex(esServer: String, esPort: String, username: String, password: String, indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): Boolean = {
 
     // create the index
     val indexJson = getIndexJson(indexName, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
+    //println(indexJson)
     val client = HttpClients.createDefault()
     try {
       // re-create the template
@@ -356,18 +312,28 @@ object SendKafkaTopicElasticsearch {
          |}
     """.stripMargin
 
-    val indexJson =
-      s"""
-         |{
-         |  "settings": $indexSettingsJson,
-         |  "mappings": {
-         |    $indexMappingJson
-         |  },
-         |  "aliases": {
-         |    "$indexName": {}
-         |  }
-         |}
-     """.stripMargin
+//    val indexJson =
+//      s"""
+//         |{
+//         |  "settings": $indexSettingsJson,
+//         |  "mappings": {
+//         |    $indexMappingJson
+//         |  },
+//         |  "aliases": {
+//         |    "$indexName": {}
+//         |  }
+//         |}
+//     """.stripMargin
+        val indexJson =
+          s"""
+             |{
+             |  "settings": $indexSettingsJson,
+             |  "mappings": {
+             |    $indexMappingJson
+             |  }
+             |}
+         """.stripMargin
+
 
     indexJson
   }
