@@ -30,17 +30,14 @@ object SendS3FilesTimescale {
 
     val numargs = args.length
 
-    if (numargs != 10 && numargs != 9) {
+    if (numargs != 8 && numargs != 7) {
       System.err.println("Usage: SendS3FilesTimescale [access-key] [secret-key] [bucket] [files] [timescaleHost] [recreateTable] [Spark Master] ")
       System.err.println("        access-key: aws access key")
       System.err.println("        secret-key: aws secret key")
       System.err.println("        bucket: Bucket to List")
       System.err.println("        files: File Pattern")
       System.err.println("        timescaleHost: Timescale Server Name or IP")
-      System.err.println("        replicationFactor: Timescale Replication Factor")
       System.err.println("        recreateTable: Delete and create table")
-      System.err.println("        useSolr: Add Search Index")
-      System.err.println("        storeGeo: Convert Lat/Lon into Geometry")
       System.err.println("        SpkMaster: Spark Master (e.g. local[8]; leave blank to use --master in spark-submit)")
 
       System.exit(1)
