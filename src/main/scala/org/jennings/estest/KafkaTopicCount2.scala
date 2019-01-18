@@ -23,7 +23,7 @@ object KafkaTopicCount2 {
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length >= 6) {
+    if (args.length < 6) {
       System.err.println("Usage: SendKafkaTopicCassandra <sparkMaster> <emitIntervalInMillis>" +
         " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads>")
       System.exit(1)
