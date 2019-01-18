@@ -30,14 +30,18 @@ object SendS3FilesTimescale {
 
     val numargs = args.length
 
-    if (numargs != 8 && numargs != 7) {
-      System.err.println("Usage: SendS3FilesTimescale [access-key] [secret-key] [bucket] [files] [timescaleHost] [recreateTable] [Spark Master] ")
+    if (numargs != 11 && numargs != 10) {
+      System.err.println("Usage: SendS3FilesTimescale [access-key] [secret-key] [bucket] [files] [timescaleHost] [recreateTable] [indexName] [tableName] [indexFields] [chunkInterval] [Spark Master] ")
       System.err.println("        access-key: aws access key")
       System.err.println("        secret-key: aws secret key")
       System.err.println("        bucket: Bucket to List")
       System.err.println("        files: File Pattern")
       System.err.println("        timescaleHost: Timescale Server Name or IP")
       System.err.println("        recreateTable: Delete and create table")
+      System.err.println("        schemaName: Schema to create table in")
+      System.err.println("        tableName: Name of table")
+      System.err.println("        indexFields: create an index for each field")
+      System.err.println("        chunkInterval: HyperTable chunk time interval (ms).  Use 0 to accept default of 7 days")
       System.err.println("        SpkMaster: Spark Master (e.g. local[8]; leave blank to use --master in spark-submit)")
 
       System.exit(1)
@@ -50,8 +54,12 @@ object SendS3FilesTimescale {
     val pattern = args(3)
     val timescaleHost = args(4)
     val recreateTable = args(5)
-    val spkMaster = if (numargs == 7) {
-      args(6)
+    val schema = args(6)
+    val table = args(7)
+    val indexFields = args(8)
+    val chunkInterval = args(9)
+    val spkMaster = if (numargs == 11) {
+      args(10)
     } else {
       ""
     }
@@ -61,12 +69,11 @@ object SendS3FilesTimescale {
     val sConf = new SparkConf(true)
         .setAppName(getClass.getSimpleName)
 
-    if (numargs == 7) {
+    if (numargs == 8) {
       sConf.setMaster(spkMaster)
     }
 
-    val schema = "realtime"
-    val table = "planes"
+
 
     val url = s"jdbc:postgresql://$timescaleHost:5432/$schema"
     val properties = new Properties
@@ -90,8 +97,7 @@ object SendS3FilesTimescale {
       CREATE TABLE IF NOT EXISTS $schema.$table
       (
         objectid    BIGSERIAL,
-        globalid    UUID,
-        id          TEXT,
+        id          UUID,
         ts          TIMESTAMP NOT NULL,
         speed       DOUBLE PRECISION,
         dist        DOUBLE PRECISION,
@@ -102,11 +108,55 @@ object SendS3FilesTimescale {
         secstodep   INTEGER,
         lon         DOUBLE PRECISION,
         lat         DOUBLE PRECISION,
+        geohash     TEXT,
+        sqrhash     TEXT,
+        pntytrihash TEXT,
+        flattrihash TEXT,
         geometry    GEOMETRY(POINT, 4326)
       )""".stripMargin
       )
 
-      statement.execute(s"select create_hypertable('$schema.$table', 'ts')")
+      if(indexFields.toBoolean){
+//        statement.execute(s"create index on $schema.$table (xxxx, ts DESC)")  //low cardinality
+//        statement.execute(s"create index on $schema.$table (ts DESC, XXXX)") //range queries
+
+        statement.execute(s"create index on $schema.$table (ts DESC, speed)")
+        statement.execute(s"create index on $schema.$table (ts DESC, dist)")
+        statement.execute(s"create index on $schema.$table (ts DESC, bearing)")
+        statement.execute(s"create index on $schema.$table (rtid, ts DESC)")
+        statement.execute(s"create index on $schema.$table (orig, ts DESC)")
+        statement.execute(s"create index on $schema.$table (dest, ts DESC)")
+        statement.execute(s"create index on $schema.$table (ts DESC, secstodep)")
+        statement.execute(s"create index on $schema.$table (ts DESC, lon)")
+        statement.execute(s"create index on $schema.$table (ts DESC, lat)")
+        statement.execute(s"create index on $schema.$table (geohash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (sqrhash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (pntytrihash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (flattrihash, ts DESC)")
+        statement.execute(s"create index on $schema.$table using GIST(geometry)")
+      }
+
+      statement.execute(s"select create_hypertable('$schema.$table', 'ts', chunk_time_interval => $chunkInterval)")
+
+      if(indexFields.toBoolean){
+        statement.execute(s"create index on $schema.$table (xxxx, ts DESC)")  //low cardinality
+        statement.execute(s"create index on $schema.$table (ts DESC, XXXX)") //range queries
+
+        statement.execute(s"create index on $schema.$table (ts DESC, speed)")
+        statement.execute(s"create index on $schema.$table (ts DESC, dist)")
+        statement.execute(s"create index on $schema.$table (ts DESC, bearing)")
+        statement.execute(s"create index on $schema.$table (rtid, ts DESC)")
+        statement.execute(s"create index on $schema.$table (orig, ts DESC)")
+        statement.execute(s"create index on $schema.$table (dest, ts DESC)")
+        statement.execute(s"create index on $schema.$table (ts DESC, secstodep)")
+        statement.execute(s"create index on $schema.$table (ts DESC, lon)")
+        statement.execute(s"create index on $schema.$table (ts DESC, lat)")
+        statement.execute(s"create index on $schema.$table (geohash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (sqrhash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (pntytrihash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (flattrihash, ts DESC)")
+        statement.execute(s"create index on $schema.$table using GIST(geometry)")
+      }
 
     }
 
