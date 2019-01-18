@@ -25,7 +25,7 @@ object SendKafkaTopicCassandraPlanesHash {
 
     if (args.length < 11) {
       System.err.println("Usage: SendKafkaTopicCassandraPlanesHash <sparkMaster> <emitIntervalInMillis>" +
-        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> (<latest=true> <keyspace=realtime> <table=planes>)")
+        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> <compactionInMinutes> <ttlInSec> (<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
 
@@ -40,10 +40,13 @@ object SendKafkaTopicCassandraPlanesHash {
     val recreateTable = args(8).toBoolean
     val storeGeo = args(9).toBoolean
     val kDebug = args(10).toBoolean
+    val compactionInMinutes = args(11).toLong
+    val ttlInSec = args(12).toLong
+
     // default latest to true
-    val kLatest = if (args.length > 11) args(11).toBoolean else true
-    val kKeyspace = if (args.length > 12) args(12) else "realtime"
-    val kTable = if (args.length > 13) args(13) else "planes"
+    val kLatest = if (args.length > 13) args(13).toBoolean else true
+    val kKeyspace = if (args.length > 14) args(14) else "realtime"
+    val kTable = if (args.length > 15) args(15) else "planes"
 
 
     val useSolr = storeGeo
@@ -91,7 +94,12 @@ object SendKafkaTopicCassandraPlanesHash {
             pntytrihash text,
             flattrihash text,
             PRIMARY KEY (id, ts)
-          )"""
+          )
+          WITH compaction = {'compaction_window_size': '$compactionInMinutes',
+                             'compaction_window_unit': 'MINUTES',
+                             'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+          AND default_time_to_live = $ttlInSec
+          """
           )
 
           if (useSolr) {
