@@ -116,31 +116,13 @@ object SendS3FilesTimescale {
       )""".stripMargin
       )
 
-      if(indexFields.toBoolean){
-//        statement.execute(s"create index on $schema.$table (xxxx, ts DESC)")  //low cardinality
-//        statement.execute(s"create index on $schema.$table (ts DESC, XXXX)") //range queries
 
-        statement.execute(s"create index on $schema.$table (ts DESC, speed)")
-        statement.execute(s"create index on $schema.$table (ts DESC, dist)")
-        statement.execute(s"create index on $schema.$table (ts DESC, bearing)")
-        statement.execute(s"create index on $schema.$table (rtid, ts DESC)")
-        statement.execute(s"create index on $schema.$table (orig, ts DESC)")
-        statement.execute(s"create index on $schema.$table (dest, ts DESC)")
-        statement.execute(s"create index on $schema.$table (ts DESC, secstodep)")
-        statement.execute(s"create index on $schema.$table (ts DESC, lon)")
-        statement.execute(s"create index on $schema.$table (ts DESC, lat)")
-        statement.execute(s"create index on $schema.$table (geohash, ts DESC)")
-        statement.execute(s"create index on $schema.$table (sqrhash, ts DESC)")
-        statement.execute(s"create index on $schema.$table (pntytrihash, ts DESC)")
-        statement.execute(s"create index on $schema.$table (flattrihash, ts DESC)")
-        statement.execute(s"create index on $schema.$table using GIST(geometry)")
-      }
 
       statement.execute(s"select create_hypertable('$schema.$table', 'ts', chunk_time_interval => $chunkInterval)")
 
       if(indexFields.toBoolean){
-        statement.execute(s"create index on $schema.$table (xxxx, ts DESC)")  //low cardinality
-        statement.execute(s"create index on $schema.$table (ts DESC, XXXX)") //range queries
+//        statement.execute(s"create index on $schema.$table (xxxx, ts DESC)")  //low cardinality
+//        statement.execute(s"create index on $schema.$table (ts DESC, XXXX)") //range queries
 
         statement.execute(s"create index on $schema.$table (ts DESC, speed)")
         statement.execute(s"create index on $schema.$table (ts DESC, dist)")
@@ -196,7 +178,7 @@ object SendS3FilesTimescale {
         classOf[org.postgresql.Driver]
         val connection = DriverManager.getConnection(url, properties)
         val copyManager = new CopyManager(connection.asInstanceOf[BaseConnection])
-        val copySql = s"""COPY $schema.$table (globalid,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
+        val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
 
         val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
