@@ -67,7 +67,7 @@ object KafkaTopicCount2 {
         total += count
         if (count > 0) {
 
-          val msg = "%s|%s|%s".format(time, count, total)
+          val msg = "%s|%s|%s".format(System.currentTimeMillis(), count, total)
           log.warn(msg)
           println(msg)
         }
