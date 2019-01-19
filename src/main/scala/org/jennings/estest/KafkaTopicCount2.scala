@@ -57,7 +57,7 @@ object KafkaTopicCount2 {
     val dataStream = stream.map(line => adaptSpecific(line))
 
 
-    var total = 0
+    var total = 0L
     println("ts|count|total")
 
     dataStream.foreachRDD {
