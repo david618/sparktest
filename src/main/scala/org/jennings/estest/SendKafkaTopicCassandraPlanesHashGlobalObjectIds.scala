@@ -25,7 +25,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
   def main(args: Array[String]): Unit = {
 
     if (args.length < 11) {
-      System.err.println("Usage: SendKafkaTopicCassandraPlanesHash <sparkMaster> <emitIntervalInMillis>" +
+      System.err.println("Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds <sparkMaster> <emitIntervalInMillis>" +
         " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> (<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
@@ -77,7 +77,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
           (
             globalid text,
             objectid bigint,
-            id text,
+            plane_id text,
             ts timestamp,
             speed double,
             dist double,
@@ -195,7 +195,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
           SomeColumns(
             "globalid",
             "objectid",
-            "id",
+            "plane_id",
             "ts",
             "speed",
             "dist",
