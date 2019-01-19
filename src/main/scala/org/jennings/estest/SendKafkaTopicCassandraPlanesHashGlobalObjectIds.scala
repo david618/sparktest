@@ -88,11 +88,11 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
             secstodep int,
             lon double,
             lat double,
-            geometry text,
-            geohash text,
-            sqrhash text,
-            pntytrihash text,
-            flattrihash text,
+            geom_4326 text,
+            esri_geohash_geohash_4326_12 text,
+            esri_geohash_square_102100_30 text,
+            esri_geohash_pointytriangle_102100_30 text,
+            esri_geohash_flattriangle_102100_30 text,
             PRIMARY KEY (globalid, ts)
           )"""
           )
@@ -206,11 +206,11 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
             "secstodep",
             "lon",
             "lat",
-            "geometry",
-            "geohash",
-            "sqrhash",
-            "pntytrihash",
-            "flattrihash"
+            "geom_4326",
+            "esri_geohash_geohash_4326_12",
+            "esri_geohash_square_102100_30",
+            "esri_geohash_pointytriangle_102100_30",
+            "esri_geohash_flattriangle_102100_30"
           )
         )
     }
