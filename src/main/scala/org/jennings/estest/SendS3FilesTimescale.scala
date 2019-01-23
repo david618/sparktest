@@ -69,7 +69,7 @@ object SendS3FilesTimescale {
     val sConf = new SparkConf(true)
         .setAppName(getClass.getSimpleName)
 
-    if (numargs == 8) {
+    if (numargs == 11) {
       sConf.setMaster(spkMaster)
     }
 
@@ -178,7 +178,7 @@ object SendS3FilesTimescale {
         classOf[org.postgresql.Driver]
         val connection = DriverManager.getConnection(url, properties)
         val copyManager = new CopyManager(connection.asInstanceOf[BaseConnection])
-        val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
+        val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geohash,sqrhash,pntytrihash,flattrihash,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
 
         val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
@@ -241,8 +241,12 @@ object SendS3FilesTimescale {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
+    val geohash = row(11)
+    val sqrHash = row(12)
+    val pntyTriHash = row(13)
+    val flatTriHash = row(14)
 
     val geometryText = "SRID=4326;POINT (" + row(9) + " " + row(10) + ")"
-    s"""$id,"$ts",$speed,$dist,$bearing,$rtid,"$orig","$dest",$secsToDep,$longitude,$latitude,"$geometryText"\n""".getBytes
+    s"""$id,"$ts",$speed,$dist,$bearing,$rtid,"$orig","$dest",$secsToDep,$longitude,$latitude,"$geohash","$sqrHash","$pntyTriHash","$flatTriHash","$geometryText"\n""".getBytes
   }
 }
