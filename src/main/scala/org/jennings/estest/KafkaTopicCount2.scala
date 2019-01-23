@@ -57,14 +57,21 @@ object KafkaTopicCount2 {
     val dataStream = stream.map(line => adaptSpecific(line))
 
 
+    var total = 0L
+    println("ts|count|total")
+
     dataStream.foreachRDD {
       (rdd, time) =>
+
         val count = rdd.count()
+        total += count
         if (count > 0) {
-          val msg = "Time %s: saving to DSE (%s total records)".format(time, count)
+
+          val msg = "%s|%s|%s".format(System.currentTimeMillis(), count, total)
           log.warn(msg)
           println(msg)
         }
+
     }
 
 

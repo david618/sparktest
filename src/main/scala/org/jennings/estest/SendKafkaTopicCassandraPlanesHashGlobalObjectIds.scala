@@ -25,7 +25,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
   def main(args: Array[String]): Unit = {
 
     if (args.length < 11) {
-      System.err.println("Usage: SendKafkaTopicCassandraPlanesHash <sparkMaster> <emitIntervalInMillis>" +
+      System.err.println("Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds <sparkMaster> <emitIntervalInMillis>" +
         " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> (<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
@@ -77,7 +77,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
           (
             globalid text,
             objectid bigint,
-            id text,
+            plane_id text,
             ts timestamp,
             speed double,
             dist double,
@@ -88,11 +88,11 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
             secstodep int,
             lon double,
             lat double,
-            geometry text,
-            geohash text,
-            sqrhash text,
-            pntytrihash text,
-            flattrihash text,
+            geom_4326 text,
+            esri_geohash_geohash_4326_12 text,
+            esri_geohash_square_102100_30 text,
+            esri_geohash_pointytriangle_102100_30 text,
+            esri_geohash_flattriangle_102100_30 text,
             PRIMARY KEY (globalid, ts)
           )"""
           )
@@ -195,7 +195,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
           SomeColumns(
             "globalid",
             "objectid",
-            "id",
+            "plane_id",
             "ts",
             "speed",
             "dist",
@@ -206,11 +206,11 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
             "secstodep",
             "lon",
             "lat",
-            "geometry",
-            "geohash",
-            "sqrhash",
-            "pntytrihash",
-            "flattrihash"
+            "geom_4326",
+            "esri_geohash_geohash_4326_12",
+            "esri_geohash_square_102100_30",
+            "esri_geohash_pointytriangle_102100_30",
+            "esri_geohash_flattriangle_102100_30"
           )
         )
     }
