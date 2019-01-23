@@ -14,6 +14,7 @@ import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
 import org.apache.spark.streaming.kafka010.KafkaUtils
 import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.jennings.estest.SendS3FilesTimescale.{RANDOM, objectMapper}
 import org.postgresql.copy.CopyManager
 import org.postgresql.core.BaseConnection
 
@@ -26,7 +27,7 @@ object SendKafkaTopicTimescale {
 
     if (args.length < 11) {
       System.err.println("Usage: SendKafkaTopicTimescale <sparkMaster> <emitIntervalInMillis>" +
-          " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <timescaleHost> <recreateTable> <debug> (<latest=true> <schema=realtime> <table=planes>)")
+          " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <timescaleHost> <recreateTable> <debug> (<latest=true> <schema=realtime> <table=planes> <indexFields=true> <chunkInterval=6.048e+11>)")
       System.exit(1)
     }
 
@@ -38,11 +39,14 @@ object SendKafkaTopicTimescale {
     val kThreads = args(5)
     val kTimescaleHost = args(6)
     val recreateTable = args(7).toBoolean
+    System.err.println("        indexFields: create an index for each field")
     val kDebug = args(8).toBoolean
     // default latest to true
-    val kLatest = if (args.length > 9) args(0).toBoolean else true
+    val kLatest = if (args.length > 9) args(9).toBoolean else true
     val kSchema = if (args.length > 10) args(10) else "realtime"
     val kTable = if (args.length > 11) args(11) else "planes"
+    val indexFields = if (args.length > 12) args(12) else "true"
+    val chunkInterval = if(args.length > 13) BigInt(args(13),10) else 6.048e+11
 
     // configuration
     val sConf = new SparkConf(true)
@@ -75,8 +79,7 @@ object SendKafkaTopicTimescale {
       CREATE TABLE IF NOT EXISTS $schema.$table
       (
         objectid    BIGSERIAL,
-        globalid    UUID,
-        id          TEXT,
+        id          UUID,
         ts          TIMESTAMP NOT NULL,
         speed       DOUBLE PRECISION,
         dist        DOUBLE PRECISION,
@@ -87,12 +90,37 @@ object SendKafkaTopicTimescale {
         secstodep   INTEGER,
         lon         DOUBLE PRECISION,
         lat         DOUBLE PRECISION,
+        geohash     TEXT,
+        sqrhash     TEXT,
+        pntytrihash TEXT,
+        flattrihash TEXT,
         geometry    GEOMETRY(POINT, 4326)
       )""".stripMargin
       )
 
-      statement.execute(s"select create_hypertable('$schema.$table', 'ts')")
 
+
+      statement.execute(s"select create_hypertable('$schema.$table', 'ts', chunk_time_interval => $chunkInterval)")
+
+      if(indexFields.toBoolean){
+        //        statement.execute(s"create index on $schema.$table (xxxx, ts DESC)")  //low cardinality
+        //        statement.execute(s"create index on $schema.$table (ts DESC, XXXX)") //range queries
+
+        statement.execute(s"create index on $schema.$table (ts DESC, speed)")
+        statement.execute(s"create index on $schema.$table (ts DESC, dist)")
+        statement.execute(s"create index on $schema.$table (ts DESC, bearing)")
+        statement.execute(s"create index on $schema.$table (rtid, ts DESC)")
+        statement.execute(s"create index on $schema.$table (orig, ts DESC)")
+        statement.execute(s"create index on $schema.$table (dest, ts DESC)")
+        statement.execute(s"create index on $schema.$table (ts DESC, secstodep)")
+        statement.execute(s"create index on $schema.$table (ts DESC, lon)")
+        statement.execute(s"create index on $schema.$table (ts DESC, lat)")
+        statement.execute(s"create index on $schema.$table (geohash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (sqrhash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (pntytrihash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (flattrihash, ts DESC)")
+        statement.execute(s"create index on $schema.$table using GIST(geometry)")
+      }
     }
 
     log.info("Done initialization, ready to start streaming...")
@@ -133,7 +161,7 @@ object SendKafkaTopicTimescale {
           classOf[org.postgresql.Driver]
           val connection = DriverManager.getConnection(url, properties)
           val copyManager = new CopyManager(connection.asInstanceOf[BaseConnection])
-          val copySql = s"""COPY $schema.$table (globalid,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
+          val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geohash,sqrhash,pntytrihash,flattrihash,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
 
           val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
@@ -217,8 +245,12 @@ object SendKafkaTopicTimescale {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
+    val geohash = row(11)
+    val sqrHash = row(12)
+    val pntyTriHash = row(13)
+    val flatTriHash = row(14)
 
     val geometryText = "SRID=4326;POINT (" + row(9) + " " + row(10) + ")"
-    s"""$id,"$ts",$speed,$dist,$bearing,$rtid,"$orig","$dest",$secsToDep,$longitude,$latitude,"$geometryText"\n""".getBytes
+    s"""$id,"$ts",$speed,$dist,$bearing,$rtid,"$orig","$dest",$secsToDep,$longitude,$latitude,"$geohash","$sqrHash","$pntyTriHash","$flatTriHash","$geometryText"\n""".getBytes
   }
 }
