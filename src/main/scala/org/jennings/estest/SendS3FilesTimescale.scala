@@ -147,7 +147,7 @@ object SendS3FilesTimescale {
     println("Done initialization, ready to start streaming...")
 
     val startTime = System.currentTimeMillis()
-    
+
     // Hardcoded to US_EAST_1 for now
     val awsCreds = new BasicAWSCredentials(accessKey, secretKey)
     val s3Client = AmazonS3ClientBuilder.standard
@@ -186,7 +186,7 @@ object SendS3FilesTimescale {
         val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
         val msg = s"Inserted $rowsCopied records.  Elapsed Time: ${(System.currentTimeMillis() - startTime)/1000} s"
-        log.warn(msg)
+        log.info(msg)
         println(msg)
 
         connection.close()
@@ -197,7 +197,7 @@ object SendS3FilesTimescale {
 
     val endTime = System.currentTimeMillis()
     log.info(s"Test Duration: ${(endTime - startTime)/1000} s")
-
+    println(s"Test Duration: ${(endTime - startTime)/1000} s")
 
 
   }

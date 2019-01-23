@@ -184,6 +184,7 @@ object SendKafkaTopicTimescale {
     ssc.awaitTermination()
     val endTime = System.currentTimeMillis()
     log.info(s"Test Duration: ${(endTime - startTime)/1000} s")
+    println(s"Test Duration: ${(endTime - startTime)/1000} s")
   }
 
   // create the kafka stream
