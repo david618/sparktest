@@ -12,6 +12,7 @@ import com.amazonaws.services.s3.model.S3ObjectSummary
 import com.fasterxml.jackson.dataformat.csv.{CsvMapper, CsvParser, CsvSchema}
 import org.apache.commons.logging.LogFactory
 import org.apache.spark.{SparkConf, SparkContext}
+import org.jennings.estest.SendKafkaTopicTimescale.log
 import org.postgresql.copy.CopyManager
 import org.postgresql.core.BaseConnection
 
@@ -145,6 +146,8 @@ object SendS3FilesTimescale {
     log.info("Done initialization, ready to start streaming...")
     println("Done initialization, ready to start streaming...")
 
+    val startTime = System.currentTimeMillis()
+    
     // Hardcoded to US_EAST_1 for now
     val awsCreds = new BasicAWSCredentials(accessKey, secretKey)
     val s3Client = AmazonS3ClientBuilder.standard
@@ -182,7 +185,7 @@ object SendS3FilesTimescale {
 
         val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
-        val msg = s"Inserted $rowsCopied records"
+        val msg = s"Inserted $rowsCopied records.  Elapsed Time: ${(System.currentTimeMillis() - startTime)/1000} s"
         log.warn(msg)
         println(msg)
 
@@ -191,6 +194,9 @@ object SendS3FilesTimescale {
 
 
     }
+
+    val endTime = System.currentTimeMillis()
+    log.info(s"Test Duration: ${(endTime - startTime)/1000} s")
 
 
 

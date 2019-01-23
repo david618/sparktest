@@ -62,6 +62,8 @@ object SendKafkaTopicTimescale {
     properties.put("user", "realtime")
     properties.put("password", "esri.test")
 
+    val startTime = System.currentTimeMillis()
+
     // check if need to recreate the tables
     if (recreateTable) {
       log.info(s"We are recreating the table: $schema.$table")
@@ -165,7 +167,7 @@ object SendKafkaTopicTimescale {
 
           val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
-          val msg = s"Inserted $rowsCopied records"
+          val msg = s"Inserted $rowsCopied records.  Elapsed Time: ${(System.currentTimeMillis() - startTime)/1000} s"
           log.warn(msg)
           println(msg)
 
@@ -180,6 +182,8 @@ object SendKafkaTopicTimescale {
     // start the stream
     ssc.start
     ssc.awaitTermination()
+    val endTime = System.currentTimeMillis()
+    log.info(s"Test Duration: ${(endTime - startTime)/1000} s")
   }
 
   // create the kafka stream
