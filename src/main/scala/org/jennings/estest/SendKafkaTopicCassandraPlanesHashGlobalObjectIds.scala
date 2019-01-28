@@ -119,10 +119,10 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
                  |  secstodep,
                  |  lon,
                  |  lat,
-                 |  geohash,
-                 |  sqrhash,
-                 |  pntytrihash,
-                 |  flattrihash
+                 |  esri_geohash_geohash_4326_12,
+                 |  esri_geohash_square_102100_30,
+                 |  esri_geohash_pointytriangle_102100_30,
+                 |  esri_geohash_flattriangle_102100_30
            """.stripMargin
             )
 
