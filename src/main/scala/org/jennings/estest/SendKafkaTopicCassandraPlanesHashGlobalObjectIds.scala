@@ -271,7 +271,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val row = rows.nextValue()
 
     val globalid = uuid.toString              // NOTE: This is to ensure unique records
-    val id = row(0).toLong
+    val id = row(0)
     val ts = row(1).toLong
     val speed = row(2).toDouble
     val dist = row(3).toDouble
