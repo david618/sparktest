@@ -121,8 +121,9 @@ object SendKafkaTopicTimescale {
         statement.execute(s"create index on $schema.$table (sqrhash, ts DESC)")
         statement.execute(s"create index on $schema.$table (pntytrihash, ts DESC)")
         statement.execute(s"create index on $schema.$table (flattrihash, ts DESC)")
-        statement.execute(s"create index on $schema.$table using GIST(geometry)")
+
       }
+      statement.execute(s"create index on $schema.$table using GIST(geometry)")
     }
 
     log.info("Done initialization, ready to start streaming...")
