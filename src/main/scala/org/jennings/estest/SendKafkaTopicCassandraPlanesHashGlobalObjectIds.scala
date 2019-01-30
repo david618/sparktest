@@ -20,13 +20,16 @@ import scala.util.Random
 object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
 
   private val log = LogFactory.getLog(this.getClass)
-  private var ObjectID = 1
+  private var objectId = 0
 
   def main(args: Array[String]): Unit = {
 
     if (args.length < 11) {
-      System.err.println("Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds <sparkMaster> <emitIntervalInMillis>" +
-        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> (<latest=true> <keyspace=realtime> <table=planes>)")
+      System.err.println(
+        "Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds <sparkMaster> <emitIntervalInMillis> " +
+        "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
+        "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
+        "(<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
 
@@ -52,9 +55,9 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
 
     // configuration
     val sConf = new SparkConf(true)
-      .set("spark.cassandra.connection.host", kCassandraHost)
-      .set("spark.cassandra.output.consistency.level", ConsistencyLevel.ONE.toString)
-      .setAppName(getClass.getSimpleName)
+        .set("spark.cassandra.connection.host", kCassandraHost)
+        .set("spark.cassandra.output.consistency.level", ConsistencyLevel.ONE.toString)
+        .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
 
@@ -73,28 +76,28 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
 
           // FiXME: Dynamically create the CREATE TABLE sql based on schema
           session.execute(s"""
-          CREATE TABLE IF NOT EXISTS $keyspace.$table
-          (
-            globalid text,
-            objectid bigint,
-            plane_id text,
-            ts timestamp,
-            speed double,
-            dist double,
-            bearing double,
-            rtid int,
-            orig text,
-            dest text,
-            secstodep int,
-            lon double,
-            lat double,
-            geom_4326 text,
-            esri_geohash_geohash_4326_12 text,
-            esri_geohash_square_102100_30 text,
-            esri_geohash_pointytriangle_102100_30 text,
-            esri_geohash_flattriangle_102100_30 text,
-            PRIMARY KEY (globalid, ts)
-          )"""
+            CREATE TABLE IF NOT EXISTS $keyspace.$table
+            (
+              globalid text,
+              objectid bigint,
+              plane_id text,
+              ts timestamp,
+              speed double,
+              dist double,
+              bearing double,
+              rtid int,
+              orig text,
+              dest text,
+              secstodep int,
+              lon double,
+              lat double,
+              geom_4326 text,
+              esri_geohash_geohash_4326_12 text,
+              esri_geohash_square_102100_30 text,
+              esri_geohash_pointytriangle_102100_30 text,
+              esri_geohash_flattriangle_102100_30 text,
+              PRIMARY KEY (globalid, ts)
+            )"""
           )
 
           if (useSolr) {
@@ -102,13 +105,12 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
             // NOTE: LOOK AT THE SOFT COMMIT INTERVAL IN SOLR
             //
             // enable search on all fields (except geometry)
-            session.execute(
-              s"""
+            session.execute(s"""
                  | CREATE SEARCH INDEX ON $keyspace.$table
                  | WITH COLUMNS
                  |  globalid,
                  |  objectid,
-                 |  id,
+                 |  plane_id,
                  |  ts,
                  |  speed,
                  |  dist,
@@ -119,18 +121,17 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
                  |  secstodep,
                  |  lon,
                  |  lat,
-                 |  geohash,
-                 |  sqrhash,
-                 |  pntytrihash,
-                 |  flattrihash
-           """.stripMargin
+                 |  esri_geohash_geohash_4326_12,
+                 |  esri_geohash_square_102100_30,
+                 |  esri_geohash_pointytriangle_102100_30,
+                 |  esri_geohash_flattriangle_102100_30
+              """.stripMargin
             )
 
             // check if we want to store the Geo
             if (storeGeo) {
               // enable search on geometry field
-              session.execute(
-                s"""
+              session.execute(s"""
                    |ALTER SEARCH INDEX SCHEMA ON $keyspace.$table
                    |ADD types.fieldType[ @name='rpt',
                    |                     @class='solr.SpatialRecursivePrefixTreeFieldType',
@@ -138,16 +139,15 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
                    |                     @worldBounds='ENVELOPE(-1000, 1000, 1000, -1000)',
                    |                     @maxDistErr='0.001',
                    |                     @distanceUnits='degrees' ]
-             """.stripMargin
+                """.stripMargin
               )
-              session.execute(
-                s"""
+              session.execute(s"""
                    |ALTER SEARCH INDEX SCHEMA ON $keyspace.$table
                    |ADD fields.field[ @name='geometry',
                    |                  @type='rpt',
                    |                  @indexed='true',
                    |                  @stored='true' ];
-             """.stripMargin
+                """.stripMargin
               )
               session.execute(
                 s"RELOAD SEARCH INDEX ON $keyspace.$table"
@@ -248,14 +248,14 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
   private val objectMapper = {
     // create an empty schema
     val schema = CsvSchema.emptySchema()
-      .withColumnSeparator(',')
-      .withLineSeparator("\\n")
+        .withColumnSeparator(',')
+        .withLineSeparator("\\n")
     // create the mapper
     val csvMapper = new CsvMapper()
     csvMapper.enable(CsvParser.Feature.WRAP_AS_ARRAY)
     csvMapper
-      .readerFor(classOf[Array[String]])
-      .`with`(schema)
+        .readerFor(classOf[Array[String]])
+        .`with`(schema)
   }
 
 
@@ -263,15 +263,15 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     * Adapt to the very specific Safegraph Schema
     */
   private def adaptSpecific(line: String) = {
-    ObjectID = ObjectID + 1
+    objectId = objectId + 1
     val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
 
     // parse out the line
     val rows = objectMapper.readValues[Array[String]](line)
     val row = rows.nextValue()
 
-    val globalid = uuid.toString              // NOTE: This is to ensure unique records
-    val id = row(0).toLong
+    val globalid = uuid.toString // NOTE: This is to ensure unique records
+    val plane_id = row(0)
     val ts = row(1).toLong
     val speed = row(2).toDouble
     val dist = row(3).toDouble
@@ -289,7 +289,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val flattrihash = row(14)
 
     // FIXME: why do we need to convert to tuples? why cant we store the data as a map?
-    val data = (globalid, ObjectID, id, ts, speed, dist, bearing, rtid, orig, dest, secsToDep, latitude, longitude, geometryText, geohash, sqrhash, pntytrihash, flattrihash)
+    val data = (globalid, objectId, plane_id, ts, speed, dist, bearing, rtid, orig, dest, secsToDep, latitude, longitude, geometryText, geohash, sqrhash, pntytrihash, flattrihash)
     //println(data)
     data
   }
