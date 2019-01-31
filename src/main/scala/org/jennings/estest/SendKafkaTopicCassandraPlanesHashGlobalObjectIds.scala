@@ -114,10 +114,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
 
           val ttlStr = s"""default_time_to_live = $ttlInSec"""
 
-          val compaction = if (compactionInMinutes.toLong > -1) true else false
-          val ttl = if (ttlInSec > -1) true else false
-
-          val createTableStr = (compaction, ttl) match {
+          val createTableStr = (compactionInMinutes > -1, ttlInSec > -1) match {
             case (true , true ) => s"""$createTableOnlyStr WITH $compactionStr AND $ttlStr"""
             case (true , false) => s"""$createTableOnlyStr WITH $compactionStr"""
             case (false, true ) => s"""$createTableOnlyStr WITH $ttlStr"""
