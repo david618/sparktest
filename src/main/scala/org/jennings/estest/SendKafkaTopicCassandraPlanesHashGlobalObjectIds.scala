@@ -29,6 +29,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
         "Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds <sparkMaster> <emitIntervalInMillis> " +
         "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
         "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
+        "<compactionInMinutes> <ttlInSec> " +
         "(<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
@@ -44,10 +45,13 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val recreateTable = args(8).toBoolean
     val storeGeo = args(9).toBoolean
     val kDebug = args(10).toBoolean
-    // default latest to true
-    val kLatest = if (args.length > 11) args(11).toBoolean else true
-    val kKeyspace = if (args.length > 12) args(12) else "realtime"
-    val kTable = if (args.length > 13) args(13) else "planes"
+    val compactionInMinutes = args(11).toLong
+    val ttlInSec = args(12).toLong
+
+    // default the optional argument values
+    val kLatest = if (args.length > 13) args(13).toBoolean else true
+    val kKeyspace = if (args.length > 14) args(14) else "realtime"
+    val kTable = if (args.length > 15) args(15) else "planes"
 
 
     val useSolr = storeGeo
@@ -97,7 +101,12 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
               esri_geohash_pointytriangle_102100_30 text,
               esri_geohash_flattriangle_102100_30 text,
               PRIMARY KEY (globalid, ts)
-            )"""
+            )
+              WITH compaction = {'compaction_window_size': '$compactionInMinutes',
+                                 'compaction_window_unit': 'MINUTES',
+                                 'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+              AND default_time_to_live = $ttlInSec
+            """
           )
 
           if (useSolr) {
