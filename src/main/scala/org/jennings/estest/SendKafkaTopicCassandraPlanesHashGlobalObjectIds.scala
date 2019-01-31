@@ -79,35 +79,52 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
           session.execute(s"DROP TABLE IF EXISTS $keyspace.$table")
 
           // FiXME: Dynamically create the CREATE TABLE sql based on schema
-          session.execute(s"""
-            CREATE TABLE IF NOT EXISTS $keyspace.$table
-            (
-              globalid text,
-              objectid bigint,
-              plane_id text,
-              ts timestamp,
-              speed double,
-              dist double,
-              bearing double,
-              rtid int,
-              orig text,
-              dest text,
-              secstodep int,
-              lon double,
-              lat double,
-              geom_4326 text,
-              esri_geohash_geohash_4326_12 text,
-              esri_geohash_square_102100_30 text,
-              esri_geohash_pointytriangle_102100_30 text,
-              esri_geohash_flattriangle_102100_30 text,
-              PRIMARY KEY (globalid, ts)
-            )
-              WITH compaction = {'compaction_window_size': '$compactionInMinutes',
-                                 'compaction_window_unit': 'MINUTES',
-                                 'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
-              AND default_time_to_live = $ttlInSec
-            """
-          )
+          val createTableOnlyStr =
+            s"""
+              CREATE TABLE IF NOT EXISTS $keyspace.$table
+              (
+                globalid text,
+                objectid bigint,
+                plane_id text,
+                ts timestamp,
+                speed double,
+                dist double,
+                bearing double,
+                rtid int,
+                orig text,
+                dest text,
+                secstodep int,
+                lon double,
+                lat double,
+                geom_4326 text,
+                esri_geohash_geohash_4326_12 text,
+                esri_geohash_square_102100_30 text,
+                esri_geohash_pointytriangle_102100_30 text,
+                esri_geohash_flattriangle_102100_30 text,
+                PRIMARY KEY (globalid, ts)
+              )
+            """.stripMargin
+
+          val compactionStr =
+            s"""
+               compaction = {'compaction_window_size': '$compactionInMinutes',
+                             'compaction_window_unit': 'MINUTES',
+                             'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+             """.stripMargin
+
+          val ttlStr = s"""default_time_to_live = $ttlInSec"""
+
+          val compaction = if (compactionInMinutes.toLong > -1) true else false
+          val ttl = if (ttlInSec > -1) true else false
+
+          val createTableStr = (compaction, ttl) match {
+            case (true , true ) => s"""$createTableOnlyStr WITH $compactionStr AND $ttlStr"""
+            case (true , false) => s"""$createTableOnlyStr WITH $compactionStr"""
+            case (false, true ) => s"""$createTableOnlyStr WITH $ttlStr"""
+            case _ => createTableOnlyStr
+          }
+
+          session.execute(createTableStr)
 
           if (useSolr) {
             //
