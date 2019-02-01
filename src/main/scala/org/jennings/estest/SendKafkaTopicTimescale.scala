@@ -97,7 +97,9 @@ object SendKafkaTopicTimescale {
         pntytrihash TEXT,
         flattrihash TEXT,
         geometry    GEOMETRY(POINT, 4326)
-      )""".stripMargin
+      )
+      TABLESPACE REALTIME
+          """.stripMargin
       )
 
 
