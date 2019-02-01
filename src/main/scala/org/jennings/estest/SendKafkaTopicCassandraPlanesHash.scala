@@ -24,8 +24,12 @@ object SendKafkaTopicCassandraPlanesHash {
   def main(args: Array[String]): Unit = {
 
     if (args.length < 11) {
-      System.err.println("Usage: SendKafkaTopicCassandraPlanesHash <sparkMaster> <emitIntervalInMillis>" +
-        " <kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> <replicationFactor> <recreateTable> <storeGeo> <debug> <compactionInMinutes> <ttlInSec> (<latest=true> <keyspace=realtime> <table=planes>)")
+      System.err.println(
+        "Usage: SendKafkaTopicCassandraPlanesHash <sparkMaster> <emitIntervalInMillis> " +
+        "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
+        "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
+        "<compactionInMinutes> <ttlInSec> " +
+        "(<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
 
@@ -43,7 +47,7 @@ object SendKafkaTopicCassandraPlanesHash {
     val compactionInMinutes = args(11).toLong
     val ttlInSec = args(12).toLong
 
-    // default latest to true
+    // default the optional argument values
     val kLatest = if (args.length > 13) args(13).toBoolean else true
     val kKeyspace = if (args.length > 14) args(14) else "realtime"
     val kTable = if (args.length > 15) args(15) else "planes"
@@ -54,9 +58,9 @@ object SendKafkaTopicCassandraPlanesHash {
 
     // configuration
     val sConf = new SparkConf(true)
-      .set("spark.cassandra.connection.host", kCassandraHost)
-      .set("spark.cassandra.output.consistency.level", ConsistencyLevel.ONE.toString)
-      .setAppName(getClass.getSimpleName)
+        .set("spark.cassandra.connection.host", kCassandraHost)
+        .set("spark.cassandra.output.consistency.level", ConsistencyLevel.ONE.toString)
+        .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
 
@@ -75,31 +79,31 @@ object SendKafkaTopicCassandraPlanesHash {
 
           // FiXME: Dynamically create the CREATE TABLE sql based on schema
           session.execute(s"""
-          CREATE TABLE IF NOT EXISTS $keyspace.$table
-          (
-            id text,
-            ts timestamp,
-            speed double,
-            dist double,
-            bearing double,
-            rtid int,
-            orig text,
-            dest text,
-            secstodep int,
-            lon double,
-            lat double,
-            geometry text,
-            geohash text,
-            sqrhash text,
-            pntytrihash text,
-            flattrihash text,
-            PRIMARY KEY (id, ts)
-          )
-          WITH compaction = {'compaction_window_size': '$compactionInMinutes',
-                             'compaction_window_unit': 'MINUTES',
-                             'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
-          AND default_time_to_live = $ttlInSec
-          """
+            CREATE TABLE IF NOT EXISTS $keyspace.$table
+            (
+              id text,
+              ts timestamp,
+              speed double,
+              dist double,
+              bearing double,
+              rtid int,
+              orig text,
+              dest text,
+              secstodep int,
+              lon double,
+              lat double,
+              geometry text,
+              geohash text,
+              sqrhash text,
+              pntytrihash text,
+              flattrihash text,
+              PRIMARY KEY (id, ts)
+            )
+              WITH compaction = {'compaction_window_size': '$compactionInMinutes',
+                                 'compaction_window_unit': 'MINUTES',
+                                 'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+              AND default_time_to_live = $ttlInSec
+            """
           )
 
           if (useSolr) {
@@ -107,8 +111,7 @@ object SendKafkaTopicCassandraPlanesHash {
             // NOTE: LOOK AT THE SOFT COMMIT INTERVAL IN SOLR
             //
             // enable search on all fields (except geometry)
-            session.execute(
-              s"""
+            session.execute(s"""
                  | CREATE SEARCH INDEX ON $keyspace.$table
                  | WITH COLUMNS
                  |  id,
@@ -126,14 +129,13 @@ object SendKafkaTopicCassandraPlanesHash {
                  |  sqrhash,
                  |  pntytrihash,
                  |  flattrihash
-           """.stripMargin
+              """.stripMargin
             )
 
             // check if we want to store the Geo
             if (storeGeo) {
               // enable search on geometry field
-              session.execute(
-                s"""
+              session.execute(s"""
                    |ALTER SEARCH INDEX SCHEMA ON $keyspace.$table
                    |ADD types.fieldType[ @name='rpt',
                    |                     @class='solr.SpatialRecursivePrefixTreeFieldType',
@@ -141,16 +143,15 @@ object SendKafkaTopicCassandraPlanesHash {
                    |                     @worldBounds='ENVELOPE(-1000, 1000, 1000, -1000)',
                    |                     @maxDistErr='0.001',
                    |                     @distanceUnits='degrees' ]
-             """.stripMargin
+                """.stripMargin
               )
-              session.execute(
-                s"""
+              session.execute(s"""
                    |ALTER SEARCH INDEX SCHEMA ON $keyspace.$table
                    |ADD fields.field[ @name='geometry',
                    |                  @type='rpt',
                    |                  @indexed='true',
                    |                  @stored='true' ];
-             """.stripMargin
+                """.stripMargin
               )
               session.execute(
                 s"RELOAD SEARCH INDEX ON $keyspace.$table"
@@ -249,14 +250,14 @@ object SendKafkaTopicCassandraPlanesHash {
   private val objectMapper = {
     // create an empty schema
     val schema = CsvSchema.emptySchema()
-      .withColumnSeparator(',')
-      .withLineSeparator("\\n")
+        .withColumnSeparator(',')
+        .withLineSeparator("\\n")
     // create the mapper
     val csvMapper = new CsvMapper()
     csvMapper.enable(CsvParser.Feature.WRAP_AS_ARRAY)
     csvMapper
-      .readerFor(classOf[Array[String]])
-      .`with`(schema)
+        .readerFor(classOf[Array[String]])
+        .`with`(schema)
   }
 
 
@@ -270,7 +271,7 @@ object SendKafkaTopicCassandraPlanesHash {
     val rows = objectMapper.readValues[Array[String]](line)
     val row = rows.nextValue()
 
-    val id = uuid.toString              // NOTE: This is to ensure unique records
+    val id = uuid.toString // NOTE: This is to ensure unique records
     val ts = row(1).toLong
     val speed = row(2).toDouble
     val dist = row(3).toDouble

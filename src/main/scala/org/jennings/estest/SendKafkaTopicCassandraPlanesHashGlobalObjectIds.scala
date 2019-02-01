@@ -29,6 +29,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
         "Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds <sparkMaster> <emitIntervalInMillis> " +
         "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
         "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
+        "<compactionInMinutes> <ttlInSec> " +
         "(<latest=true> <keyspace=realtime> <table=planes>)")
       System.exit(1)
     }
@@ -44,10 +45,13 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val recreateTable = args(8).toBoolean
     val storeGeo = args(9).toBoolean
     val kDebug = args(10).toBoolean
-    // default latest to true
-    val kLatest = if (args.length > 11) args(11).toBoolean else true
-    val kKeyspace = if (args.length > 12) args(12) else "realtime"
-    val kTable = if (args.length > 13) args(13) else "planes"
+    val compactionInMinutes = args(11).toLong
+    val ttlInSec = args(12).toLong
+
+    // default the optional argument values
+    val kLatest = if (args.length > 13) args(13).toBoolean else true
+    val kKeyspace = if (args.length > 14) args(14) else "realtime"
+    val kTable = if (args.length > 15) args(15) else "planes"
 
 
     val useSolr = storeGeo
@@ -75,30 +79,49 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
           session.execute(s"DROP TABLE IF EXISTS $keyspace.$table")
 
           // FiXME: Dynamically create the CREATE TABLE sql based on schema
-          session.execute(s"""
-            CREATE TABLE IF NOT EXISTS $keyspace.$table
-            (
-              globalid text,
-              objectid bigint,
-              plane_id text,
-              ts timestamp,
-              speed double,
-              dist double,
-              bearing double,
-              rtid int,
-              orig text,
-              dest text,
-              secstodep int,
-              lon double,
-              lat double,
-              geom_4326 text,
-              esri_geohash_geohash_4326_12 text,
-              esri_geohash_square_102100_30 text,
-              esri_geohash_pointytriangle_102100_30 text,
-              esri_geohash_flattriangle_102100_30 text,
-              PRIMARY KEY (globalid, ts)
-            )"""
-          )
+          val createTableOnlyStr =
+            s"""
+              CREATE TABLE IF NOT EXISTS $keyspace.$table
+              (
+                globalid text,
+                objectid bigint,
+                plane_id text,
+                ts timestamp,
+                speed double,
+                dist double,
+                bearing double,
+                rtid int,
+                orig text,
+                dest text,
+                secstodep int,
+                lon double,
+                lat double,
+                geom_4326 text,
+                esri_geohash_geohash_4326_12 text,
+                esri_geohash_square_102100_30 text,
+                esri_geohash_pointytriangle_102100_30 text,
+                esri_geohash_flattriangle_102100_30 text,
+                PRIMARY KEY (globalid, ts)
+              )
+            """.stripMargin
+
+          val compactionStr =
+            s"""
+               compaction = {'compaction_window_size': '$compactionInMinutes',
+                             'compaction_window_unit': 'MINUTES',
+                             'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+             """.stripMargin
+
+          val ttlStr = s"""default_time_to_live = $ttlInSec"""
+
+          val createTableStr = (compactionInMinutes > -1, ttlInSec > -1) match {
+            case (true , true ) => s"""$createTableOnlyStr WITH $compactionStr AND $ttlStr"""
+            case (true , false) => s"""$createTableOnlyStr WITH $compactionStr"""
+            case (false, true ) => s"""$createTableOnlyStr WITH $ttlStr"""
+            case _ => createTableOnlyStr
+          }
+
+          session.execute(createTableStr)
 
           if (useSolr) {
             //
