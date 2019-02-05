@@ -238,7 +238,9 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
           )
         } catch {
           case error: Throwable =>
+            println("***** rdd.saveToCassandra caught the following exception: *****")
             error.printStackTrace()
+            println("***** dropped the current rdd.saveToCassandra batch and continue with the next batch... *****")
         }
     }
 
