@@ -59,7 +59,6 @@ object SendKafkaTopicCassandraPlanesHash {
     // configuration
     val sConf = new SparkConf(true)
         .set("spark.cassandra.connection.host", kCassandraHost)
-        .set("spark.cassandra.output.consistency.level", ConsistencyLevel.ONE.toString)
         .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
@@ -192,30 +191,35 @@ object SendKafkaTopicCassandraPlanesHash {
     // save to cassandra
     dataStream.foreachRDD {
       (rdd, _) =>
-        rdd.saveToCassandra(
-          keyspace,
-          table,
-          // FIXME: Do we need to specify all the columns?
-          SomeColumns(
-            "id",
-            "ts",
-            "speed",
-            "dist",
-            "bearing",
-            "rtid",
-            "orig",
-            "dest",
-            "secstodep",
-            "lon",
-            "lat",
-            "geometry",
-            "geohash",
-            "sqrhash",
-            "pntytrihash",
-            "flattrihash"
+        try {
+          rdd.saveToCassandra(
+            keyspace,
+            table,
+            // FIXME: Do we need to specify all the columns?
+            SomeColumns(
+              "id",
+              "ts",
+              "speed",
+              "dist",
+              "bearing",
+              "rtid",
+              "orig",
+              "dest",
+              "secstodep",
+              "lon",
+              "lat",
+              "geometry",
+              "geohash",
+              "sqrhash",
+              "pntytrihash",
+              "flattrihash"
+            )
           )
-        )
-    }
+        } catch {
+          case error: Throwable =>
+            error.printStackTrace()
+        }
+  }
 
     log.info("Stream is starting now...")
     println("Stream is starting now...")

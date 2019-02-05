@@ -60,7 +60,6 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     // configuration
     val sConf = new SparkConf(true)
         .set("spark.cassandra.connection.host", kCassandraHost)
-        .set("spark.cassandra.output.consistency.level", ConsistencyLevel.ONE.toString)
         .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
@@ -211,31 +210,36 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     // save to cassandra
     dataStream.foreachRDD {
       (rdd, _) =>
-        rdd.saveToCassandra(
-          keyspace,
-          table,
-          // FIXME: Do we need to specify all the columns?
-          SomeColumns(
-            "globalid",
-            "objectid",
-            "plane_id",
-            "ts",
-            "speed",
-            "dist",
-            "bearing",
-            "rtid",
-            "orig",
-            "dest",
-            "secstodep",
-            "lon",
-            "lat",
-            "geom_4326",
-            "esri_geohash_geohash_4326_12",
-            "esri_geohash_square_102100_30",
-            "esri_geohash_pointytriangle_102100_30",
-            "esri_geohash_flattriangle_102100_30"
+        try {
+          rdd.saveToCassandra(
+            keyspace,
+            table,
+            // FIXME: Do we need to specify all the columns?
+            SomeColumns(
+              "globalid",
+              "objectid",
+              "plane_id",
+              "ts",
+              "speed",
+              "dist",
+              "bearing",
+              "rtid",
+              "orig",
+              "dest",
+              "secstodep",
+              "lon",
+              "lat",
+              "geom_4326",
+              "esri_geohash_geohash_4326_12",
+              "esri_geohash_square_102100_30",
+              "esri_geohash_pointytriangle_102100_30",
+              "esri_geohash_flattriangle_102100_30"
+            )
           )
-        )
+        } catch {
+          case error: Throwable =>
+            error.printStackTrace()
+        }
     }
 
     log.info("Stream is starting now...")
