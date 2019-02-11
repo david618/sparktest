@@ -26,11 +26,13 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
 
     if (args.length < 11) {
       System.err.println(
-        "Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds <sparkMaster> <emitIntervalInMillis> " +
-        "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
-        "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
-        "<compactionInMinutes> <ttlInSec> " +
-        "(<latest=true> <keyspace=realtime> <table=planes>)")
+        "Usage: SendKafkaTopicCassandraPlanesHashGlobalObjectIds " +
+            "<sparkMaster> <emitIntervalInMillis> " +
+            "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
+            "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
+            "<compactionInMinutes=-1> <ttlInSec=-1> <consistencyLevel=ANY> " +
+            "<latest=true> <keyspace=realtime> <table=planes>"
+      )
       System.exit(1)
     }
 
@@ -45,13 +47,14 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val recreateTable = args(8).toBoolean
     val storeGeo = args(9).toBoolean
     val kDebug = args(10).toBoolean
-    val compactionInMinutes = args(11).toLong
-    val ttlInSec = args(12).toLong
 
     // default the optional argument values
-    val kLatest = if (args.length > 13) args(13).toBoolean else true
-    val kKeyspace = if (args.length > 14) args(14) else "realtime"
-    val kTable = if (args.length > 15) args(15) else "planes"
+    val compactionInMinutes = if (args.length > 11) args(11).toLong else -1
+    val ttlInSec = if (args.length > 12) args(12).toLong else -1
+    val consistencyLevel = if (args.length > 13) args(13) else ConsistencyLevel.ANY.toString
+    val kLatest = if (args.length > 14) args(14).toBoolean else true
+    val kKeyspace = if (args.length > 15) args(15) else "realtime"
+    val kTable = if (args.length > 16) args(16) else "planes"
 
 
     val useSolr = storeGeo
@@ -60,6 +63,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     // configuration
     val sConf = new SparkConf(true)
         .set("spark.cassandra.connection.host", kCassandraHost)
+        .set("spark.cassandra.output.consistency.level", consistencyLevel)
         .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)

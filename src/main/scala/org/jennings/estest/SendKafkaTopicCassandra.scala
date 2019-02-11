@@ -8,12 +8,12 @@ import com.datastax.spark.connector.cql.CassandraConnector
 import com.fasterxml.jackson.dataformat.csv.{CsvMapper, CsvParser, CsvSchema}
 import org.apache.commons.logging.LogFactory
 import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
 import org.apache.spark.streaming.kafka010.KafkaUtils
 import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.{Milliseconds, StreamingContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.util.Random
 
@@ -25,10 +25,13 @@ object SendKafkaTopicCassandra {
 
     if (args.length < 11) {
       System.err.println(
-        "Usage: SendKafkaTopicCassandra <sparkMaster> <emitIntervalInMillis> " +
-        "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
-        "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
-        "(<latest=true> <keyspace=realtime> <table=planes>)")
+        "Usage: SendKafkaTopicCassandra " +
+            "<sparkMaster> <emitIntervalInMillis> " +
+            "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
+            "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
+            "<compactionInMinutes=-1> <ttlInSec=-1> <consistencyLevel=ANY> " +
+            "<latest=true> <keyspace=realtime> <table=planes>"
+      )
       System.exit(1)
     }
 
@@ -45,9 +48,12 @@ object SendKafkaTopicCassandra {
     val kDebug = args(10).toBoolean
 
     // default the optional argument values
-    val kLatest = if (args.length > 11) args(11).toBoolean else true
-    val kKeyspace = if (args.length > 12) args(12) else "realtime"
-    val kTable = if (args.length > 13) args(13) else "planes"
+    val compactionInMinutes = if (args.length > 11) args(11).toLong else -1
+    val ttlInSec = if (args.length > 12) args(12).toLong else -1
+    val consistencyLevel = if (args.length > 13) args(13) else ConsistencyLevel.ANY.toString
+    val kLatest = if (args.length > 14) args(14).toBoolean else true
+    val kKeyspace = if (args.length > 15) args(15) else "realtime"
+    val kTable = if (args.length > 16) args(16) else "planes"
 
 
     val useSolr = storeGeo
@@ -56,6 +62,7 @@ object SendKafkaTopicCassandra {
     // configuration
     val sConf = new SparkConf(true)
         .set("spark.cassandra.connection.host", kCassandraHost)
+        .set("spark.cassandra.output.consistency.level", consistencyLevel)
         .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
@@ -74,25 +81,43 @@ object SendKafkaTopicCassandra {
           session.execute(s"DROP TABLE IF EXISTS $keyspace.$table")
 
           // FiXME: Dynamically create the CREATE TABLE sql based on schema
-          session.execute(s"""
-            CREATE TABLE IF NOT EXISTS $keyspace.$table
-            (
-              id text,
-              ts timestamp,
-              speed double,
-              dist double,
-              bearing double,
-              rtid int,
-              orig text,
-              dest text,
-              secstodep int,
-              lon double,
-              lat double,
-              geometry text,
-              PRIMARY KEY (id, ts)
-            )
-            """
-          )
+          val createTableOnlyStr =
+            s"""
+              CREATE TABLE IF NOT EXISTS $keyspace.$table
+              (
+                id text,
+                ts timestamp,
+                speed double,
+                dist double,
+                bearing double,
+                rtid int,
+                orig text,
+                dest text,
+                secstodep int,
+                lon double,
+                lat double,
+                geometry text,
+                PRIMARY KEY (id, ts)
+              )
+            """.stripMargin
+
+          val compactionStr =
+            s"""
+               compaction = {'compaction_window_size': '$compactionInMinutes',
+                             'compaction_window_unit': 'MINUTES',
+                             'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+             """.stripMargin
+
+          val ttlStr = s"""default_time_to_live = $ttlInSec"""
+
+          val createTableStr = (compactionInMinutes > -1, ttlInSec > -1) match {
+            case (true , true ) => s"""$createTableOnlyStr WITH $compactionStr AND $ttlStr"""
+            case (true , false) => s"""$createTableOnlyStr WITH $compactionStr"""
+            case (false, true ) => s"""$createTableOnlyStr WITH $ttlStr"""
+            case _ => createTableOnlyStr
+          }
+
+          session.execute(createTableStr)
 
           if (useSolr) {
             //
