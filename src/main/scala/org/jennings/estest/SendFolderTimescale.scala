@@ -25,7 +25,7 @@ object SendFolderTimescale {
 
     val numargs = args.length
 
-    if (numargs !=  7 || numargs != 8) {
+    if (numargs !=  7 && numargs != 8) {
       System.err.println("Usage: SendFolderTimescale foldername [timescaleHost] [recreateTable] [schema] [table] [indexFields] [chunkInterval] { [Spark Master] ")
       System.err.println("        foldername: All files in this folder will be loaded.")
       System.err.println("        timescaleHost: Timescale Server Name or IP")
