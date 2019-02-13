@@ -30,7 +30,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
             "<sparkMaster> <emitIntervalInMillis> " +
             "<kafkaBrokers> <kafkaConsumerGroup> <kafkaTopics> <kafkaThreads> <cassandraHost> " +
             "<replicationFactor> <recreateTable> <storeGeo> <debug> " +
-            "<compactionInMinutes=-1> <ttlInSec=-1> <consistencyLevel=ANY> " +
+            "<compactionInMinutes=-1> <ttlInSec=-1> <gc_grace_seconds=0> <consistencyLevel=ANY> " +
             "<latest=true> <keyspace=realtime> <table=planes>"
       )
       System.exit(1)
@@ -51,10 +51,11 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     // default the optional argument values
     val compactionInMinutes = if (args.length > 11) args(11).toLong else -1
     val ttlInSec = if (args.length > 12) args(12).toLong else -1
-    val consistencyLevel = if (args.length > 13) args(13) else ConsistencyLevel.ANY.toString
-    val kLatest = if (args.length > 14) args(14).toBoolean else true
-    val kKeyspace = if (args.length > 15) args(15) else "realtime"
-    val kTable = if (args.length > 16) args(16) else "planes"
+    val gcGraceSeconds = if (args.length > 13) args(13) else 0
+    val consistencyLevel = if (args.length > 14) args(14) else ConsistencyLevel.ANY.toString
+    val kLatest = if (args.length > 15) args(15).toBoolean else true
+    val kKeyspace = if (args.length > 16) args(16) else "realtime"
+    val kTable = if (args.length > 17) args(17) else "planes"
 
 
     val useSolr = storeGeo
@@ -117,11 +118,13 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
 
           val ttlStr = s"""default_time_to_live = $ttlInSec"""
 
+          val gcGraceStr = s"""gc_grace_seconds = $gcGraceSeconds"""  // DSE default is 864000
+
           val createTableStr = (compactionInMinutes > -1, ttlInSec > -1) match {
-            case (true , true ) => s"""$createTableOnlyStr WITH $compactionStr AND $ttlStr"""
-            case (true , false) => s"""$createTableOnlyStr WITH $compactionStr"""
-            case (false, true ) => s"""$createTableOnlyStr WITH $ttlStr"""
-            case _ => createTableOnlyStr
+            case (true , true ) => s"""$createTableOnlyStr WITH $compactionStr AND $ttlStr AND $gcGraceStr"""
+            case (true , false) => s"""$createTableOnlyStr WITH $compactionStr AND $gcGraceStr"""
+            case (false, true ) => s"""$createTableOnlyStr WITH $ttlStr AND $gcGraceStr"""
+            case _ => s"""$createTableOnlyStr WITH $gcGraceStr"""
           }
 
           session.execute(createTableStr)
@@ -248,6 +251,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
         }
     }
 
+    println(s"Running Spark Streaming Context with conf: ${sc.getConf.getAll}")
     log.info("Stream is starting now...")
     println("Stream is starting now...")
 

@@ -229,6 +229,7 @@ object SendKafkaTopicCassandra {
         }
     }
 
+    println(s"Running Spark Streaming Context with conf: ${sc.getConf.getAll}")
     log.info("Stream is starting now...")
     println("Stream is starting now...")
 
