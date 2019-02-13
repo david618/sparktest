@@ -164,13 +164,14 @@ object SendKafkaTopicTimescale {
       (rdd, _) =>
         rdd.foreachPartition( iterator => {
           classOf[org.postgresql.Driver]
+          val transactionStart = System.currentTimeMillis();
           val connection = DriverManager.getConnection(url, properties)
           val copyManager = new CopyManager(connection.asInstanceOf[BaseConnection])
           val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geohash,sqrhash,pntytrihash,flattrihash,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
 
           val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
-          val msg = s"Inserted $rowsCopied records.  Elapsed Time: ${(System.currentTimeMillis() - startTime)/1000} s"
+          val msg = s"${(System.currentTimeMillis() - startTime)/1000}: Inserted $rowsCopied records in ${(System.currentTimeMillis() - transactionStart)/1000} s"
           log.warn(msg)
           println(msg)
 
@@ -201,6 +202,7 @@ object SendKafkaTopicTimescale {
       "enable.auto.commit" -> (false: java.lang.Boolean)
     )
     val topicMap = topics.split(",")
+
     val kafkaStreams = (1 to numOfThreads).map { i =>
       KafkaUtils.createDirectStream[String, String](ssc, PreferConsistent, Subscribe[String, String](topicMap, kafkaParams)).map(_.value())
     }
