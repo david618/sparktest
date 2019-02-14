@@ -166,18 +166,12 @@ object SendKafkaTopicTimescale {
       (rdd, _) =>
         rdd.foreachPartition( iterator => {
 
-
-          val connection = ConnectionPool.getConnection(url, properties)
-
-
-          val copyManager = new CopyManager(connection.asInstanceOf[BaseConnection])
+          val cachedConnection = ConnectionPool.getConnection(url, properties)
+          val copyManager = cachedConnection.copyManager
           val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geohash,sqrhash,pntytrihash,flattrihash,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
 
           val transactionStart = System.currentTimeMillis()
           val stream = rddToInputStream(iterator)
-
-          log.warn(s"stream ready in ${(System.currentTimeMillis() - transactionStart)/1000} s")
-          println(s"stream ready in ${(System.currentTimeMillis() - transactionStart)/1000} s")
 
           val rowsCopied = copyManager.copyIn(copySql, stream)
 
@@ -185,7 +179,7 @@ object SendKafkaTopicTimescale {
           log.warn(msg)
           println(msg)
 
-          connection.close()
+          ConnectionPool.returnConnection(cachedConnection)
         })
     }
 
@@ -278,35 +272,43 @@ object SendKafkaTopicTimescale {
 
 object ConnectionPool {
 
-  val maxConnections = 10
-  val availableConnections: ListBuffer[Connection] = ListBuffer.empty
-  val inUseConnections: mutable.HashMap[Int, Connection] = mutable.HashMap.empty
+  val maxConnections = 100
+  val availableConnections: ListBuffer[CopyConnectionManager] = ListBuffer.empty
+  val inUseConnections: mutable.HashMap[Int, CopyConnectionManager] = mutable.HashMap.empty
 
   classOf[org.postgresql.Driver]
 
-  def getConnection(url: String, properties: Properties): Connection = {
-    var connection: Connection = null
+  def getConnection(url: String, properties: Properties): CopyConnectionManager = {
+
+    var cachedConnection: CopyConnectionManager = null
     if (availableConnections.length > 0) {
       if (inUseConnections.size >= maxConnections) {
         throw new Exception("Max DB connections exceeded")
       }
-      connection = availableConnections.remove(availableConnections.length - 1)
-      if (connection.isClosed) {
-        connection = DriverManager.getConnection(url, properties)
+      cachedConnection = availableConnections.remove(availableConnections.length - 1)
+      if (cachedConnection.connection.isClosed) {
+        //return new cached object
+        val connection = DriverManager.getConnection(url, properties)
+        cachedConnection = new CopyConnectionManager(connection, new CopyManager(connection.asInstanceOf[BaseConnection]))
       }
     }
     else {
-      connection = DriverManager.getConnection(url, properties)
+      val connection = DriverManager.getConnection(url, properties)
+      cachedConnection = new CopyConnectionManager(connection, new CopyManager(connection.asInstanceOf[BaseConnection]))
     }
-    inUseConnections.put(connection.hashCode, connection)
-    connection
+    inUseConnections.put(cachedConnection.hashCode, cachedConnection)
+    cachedConnection
   }
 
-  def returnConnection(connection: Connection): Unit = {
+  def returnConnection(connection: CopyConnectionManager): Unit = {
     if (inUseConnections.contains(connection.hashCode)) {
       inUseConnections.remove(connection.hashCode)
       availableConnections += connection
     }
   }
+
+}
+
+case class CopyConnectionManager(connection: Connection, copyManager: CopyManager){
 
 }
