@@ -165,20 +165,21 @@ object SendKafkaTopicTimescale {
     dataStream.foreachRDD {
       (rdd, _) =>
         rdd.foreachPartition( iterator => {
-          
-          val transactionStart = System.currentTimeMillis()
+
+
           val connection = ConnectionPool.getConnection(url, properties)
 
-          log.warn(s"getConnection took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
-          println(s"getConnection took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
 
           val copyManager = new CopyManager(connection.asInstanceOf[BaseConnection])
           val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geohash,sqrhash,pntytrihash,flattrihash,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
 
-          log.warn(s"initialization took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
-          println(s"initialization took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
+          val transactionStart = System.currentTimeMillis()
+          val stream = rddToInputStream(iterator)
 
-          val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
+          log.warn(s"stream ready in ${(System.currentTimeMillis() - transactionStart)/1000} s")
+          println(s"stream ready in ${(System.currentTimeMillis() - transactionStart)/1000} s")
+
+          val rowsCopied = copyManager.copyIn(copySql, stream)
 
           val msg = s"${(System.currentTimeMillis() - startTime)/1000}: Inserted $rowsCopied records in ${(System.currentTimeMillis() - transactionStart)/1000} s"
           log.warn(msg)
