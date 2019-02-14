@@ -1,7 +1,7 @@
 package org.jennings.estest
 
 import java.io.InputStream
-import java.sql.DriverManager
+import java.sql.{Connection, DriverManager}
 import java.text.SimpleDateFormat
 import java.util.{Date, Properties, UUID}
 
@@ -18,6 +18,8 @@ import org.jennings.estest.SendS3FilesTimescale.{RANDOM, objectMapper}
 import org.postgresql.copy.CopyManager
 import org.postgresql.core.BaseConnection
 
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 object SendKafkaTopicTimescale {
@@ -163,11 +165,18 @@ object SendKafkaTopicTimescale {
     dataStream.foreachRDD {
       (rdd, _) =>
         rdd.foreachPartition( iterator => {
-          classOf[org.postgresql.Driver]
-          val transactionStart = System.currentTimeMillis();
-          val connection = DriverManager.getConnection(url, properties)
+          
+          val transactionStart = System.currentTimeMillis()
+          val connection = ConnectionPool.getConnection(url, properties)
+
+          log.warn(s"getConnection took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
+          println(s"getConnection took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
+
           val copyManager = new CopyManager(connection.asInstanceOf[BaseConnection])
           val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geohash,sqrhash,pntytrihash,flattrihash,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
+
+          log.warn(s"initialization took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
+          println(s"initialization took ${(System.currentTimeMillis() - transactionStart)/1000} s" )
 
           val rowsCopied = copyManager.copyIn(copySql, rddToInputStream(iterator))
 
@@ -263,4 +272,40 @@ object SendKafkaTopicTimescale {
     val geometryText = "SRID=4326;POINT (" + row(9) + " " + row(10) + ")"
     s"""$id,"$ts",$speed,$dist,$bearing,$rtid,"$orig","$dest",$secsToDep,$longitude,$latitude,"$geohash","$sqrHash","$pntyTriHash","$flatTriHash","$geometryText"\n""".getBytes
   }
+}
+
+
+object ConnectionPool {
+
+  val maxConnections = 10
+  val availableConnections: ListBuffer[Connection] = ListBuffer.empty
+  val inUseConnections: mutable.HashMap[Int, Connection] = mutable.HashMap.empty
+
+  classOf[org.postgresql.Driver]
+
+  def getConnection(url: String, properties: Properties): Connection = {
+    var connection: Connection = null
+    if (availableConnections.length > 0) {
+      if (inUseConnections.size >= maxConnections) {
+        throw new Exception("Max DB connections exceeded")
+      }
+      connection = availableConnections.remove(availableConnections.length - 1)
+      if (connection.isClosed) {
+        connection = DriverManager.getConnection(url, properties)
+      }
+    }
+    else {
+      connection = DriverManager.getConnection(url, properties)
+    }
+    inUseConnections.put(connection.hashCode, connection)
+    connection
+  }
+
+  def returnConnection(connection: Connection): Unit = {
+    if (inUseConnections.contains(connection.hashCode)) {
+      inUseConnections.remove(connection.hashCode)
+      availableConnections += connection
+    }
+  }
+
 }
