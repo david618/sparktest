@@ -3,6 +3,7 @@ package org.jennings.estest
 import java.io.InputStream
 import java.sql.{Connection, DriverManager}
 import java.text.SimpleDateFormat
+import java.util.concurrent.{ArrayBlockingQueue, ConcurrentHashMap}
 import java.util.{Date, Properties, UUID}
 
 import com.fasterxml.jackson.dataformat.csv.{CsvMapper, CsvParser, CsvSchema}
@@ -273,37 +274,35 @@ object SendKafkaTopicTimescale {
 object ConnectionPool {
 
   val maxConnections = 100
-  val availableConnections: ListBuffer[CopyConnectionManager] = ListBuffer.empty
-  val inUseConnections: mutable.HashMap[Int, CopyConnectionManager] = mutable.HashMap.empty
+  var connectionsOpen = 0
+  val connectionPool: java.util.concurrent.ArrayBlockingQueue[CopyConnectionManager] = new ArrayBlockingQueue[CopyConnectionManager](maxConnections)
 
   classOf[org.postgresql.Driver]
 
   def getConnection(url: String, properties: Properties): CopyConnectionManager = {
 
-    var cachedConnection: CopyConnectionManager = null
-    if (availableConnections.length > 0) {
-      if (inUseConnections.size >= maxConnections) {
-        throw new Exception("Max DB connections exceeded")
-      }
-      cachedConnection = availableConnections.remove(availableConnections.length - 1)
-      if (cachedConnection.connection.isClosed) {
-        //return new cached object
+    var cachedConnection = connectionPool.poll()
+    if(cachedConnection == null){
+      //pool is empty, create new connection
+      connectionsOpen += 1
+      val connection = DriverManager.getConnection(url, properties)
+      cachedConnection = new CopyConnectionManager(connection, new CopyManager(connection.asInstanceOf[BaseConnection]))
+    } else {
+      //validate connection
+      if(cachedConnection.connection.isClosed){
+        //create new connection but don't increment open count
         val connection = DriverManager.getConnection(url, properties)
         cachedConnection = new CopyConnectionManager(connection, new CopyManager(connection.asInstanceOf[BaseConnection]))
       }
     }
-    else {
-      val connection = DriverManager.getConnection(url, properties)
-      cachedConnection = new CopyConnectionManager(connection, new CopyManager(connection.asInstanceOf[BaseConnection]))
-    }
-    inUseConnections.put(cachedConnection.hashCode, cachedConnection)
+
     cachedConnection
   }
 
   def returnConnection(connection: CopyConnectionManager): Unit = {
-    if (inUseConnections.contains(connection.hashCode)) {
-      inUseConnections.remove(connection.hashCode)
-      availableConnections += connection
+    if(!connection.connection.isClosed) {
+      connectionsOpen -= 1
+      connectionPool.put(connection)
     }
   }
 
