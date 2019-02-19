@@ -252,7 +252,10 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
         }
     }
 
-    println(s"Running Spark Streaming Context with conf: ${sc.getConf.getAll}")
+    println(s"*** Running spark with config:")
+    sConf.getAll.foreach(println)
+    println(s"***")
+
     log.info("Stream is starting now...")
     println("Stream is starting now...")
 

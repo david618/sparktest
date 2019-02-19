@@ -52,36 +52,42 @@ object SendKafkaTopicElasticsearch {
 
 
     if (args.length < 13) {
-      System.err.println("Usage: SendKafkaTopicElasticsearch [spkMaster] [emitIntervalMS] [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +
-        "[elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards] [recreateTable] [debug] (<latest=true> <keyspace=realtime> <table=planes>)")
+      System.err.println(
+        "Usage: SendKafkaTopicElasticsearch" +
+            " [spkMaster] [emitIntervalMS]" +                                                           // 0-1
+            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                        // 2-5
+            " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +   // 6-10
+            " [recreateTable] [debug]" +                                                                // 11-12
+            " <latest=true> " +                                                                         // 13
+            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>")   // 14-17
       System.exit(1)
     }
 
     // parse arguments
-    //val Array(filename,esServer,esPort,spkMaster,indexAndType) = args
-    val sparkMaster = args(0)
-    val emitInterval = args(1).toLong
-    val kBrokers = args(2)
-    val kConsumerGroup = args(3)
-    val kTopics = args(4)
-    val kThreads = args(5)
-    val esServer = args(6)
-    val esPort = args(7)
-    val esUsername = args(8)
-    val esPassword = args(9)
-    val esNumOfShards = args(10).toInt
-    val recreateIndex = args(11).toBoolean
-    val kDebug = args(12).toBoolean
-    // optional params
-    val kLatest = if (args.length > 13) args(13).toBoolean else true
-    val esIndexName = if (args.length > 14) args(14) else "planes"
+    val sparkMaster: String = args(0)
+    val emitInterval: Long = args(1).toLong
 
+    val kBrokers: String = args(2)
+    val kConsumerGroup: String = args(3)
+    val kTopics: String = args(4)
+    val kThreads: String = args(5)
 
-    // TODO - make these arguments?
-    val replicationFactor: Int = 0
-    val refreshInterval: String = "60s"
-    val maxRecordCount: Int = 10000
+    val esServer: String = args(6)
+    val esPort: String = args(7)
+    val esUsername: String = args(8)
+    val esPassword: String = args(9)
+    val esNumOfShards: Int = args(10).toInt
 
+    val recreateIndex: Boolean = args(11).toBoolean
+    val kDebug: Boolean = args(12).toBoolean
+
+    // optional arguments
+    val kLatest: Boolean = if (args.length > 13) args(13).toBoolean else true
+
+    val indexName: String = if (args.length > 14) args(14) else "planes"
+    val refreshInterval: String = if (args.length > 15) args(15) else "60s"
+    val maxRecordCount: Int = if (args.length > 16) args(16).toInt else 10000
+    val replicationFactor: Int = if (args.length > 17) args(17).toInt else 0
 
 
     val sConf = new SparkConf(true)
@@ -99,14 +105,17 @@ object SendKafkaTopicElasticsearch {
 
     val sc = new SparkContext(sparkMaster, "KafkaToElastic", sConf)
 
+    println(s"*** Running spark with config:")
+    sConf.getAll.foreach(println)
+    println(s"***")
 
 
     // The following delete and create an Elasticsearch Index; otherwise it assumes index already exists
     if (recreateIndex) {
-      println(s"We are recreating the index: $esIndexName")
-      log.info(s"We are recreating the index: $esIndexName")
-      deleteIndex(esServer, esPort, esUsername, esPassword, esIndexName)
-      createIndex(esServer, esPort, esUsername, esPassword, esIndexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
+      println(s"We are recreating the index: $indexName")
+      log.info(s"We are recreating the index: $indexName")
+      deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
+      createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
     }
 
     log.info("Done initialization, ready to start streaming...")
@@ -141,7 +150,7 @@ object SendKafkaTopicElasticsearch {
 //      rdd.foreach(a => {
 //        println(a)
 //      })
-      EsSpark.saveJsonToEs(rdd, s"$esIndexName/$DEFAULT_TYPE_NAME")
+      EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
     }
 
     log.info("Stream is starting now...")
@@ -265,7 +274,7 @@ object SendKafkaTopicElasticsearch {
          |    "max_result_window": $maxRecordCount
          |  }
          |}
-     """.stripMargin
+      """.stripMargin
 
     val indexMappingJson =
       s"""
@@ -310,29 +319,17 @@ object SendKafkaTopicElasticsearch {
          |    }
          |  }
          |}
-    """.stripMargin
+     """.stripMargin
 
-//    val indexJson =
-//      s"""
-//         |{
-//         |  "settings": $indexSettingsJson,
-//         |  "mappings": {
-//         |    $indexMappingJson
-//         |  },
-//         |  "aliases": {
-//         |    "$indexName": {}
-//         |  }
-//         |}
-//     """.stripMargin
-        val indexJson =
-          s"""
-             |{
-             |  "settings": $indexSettingsJson,
-             |  "mappings": {
-             |    $indexMappingJson
-             |  }
-             |}
-         """.stripMargin
+    val indexJson =
+      s"""
+         |{
+         |  "settings": $indexSettingsJson,
+         |  "mappings": {
+         |    $indexMappingJson
+         |  }
+         |}
+      """.stripMargin
 
 
     indexJson
