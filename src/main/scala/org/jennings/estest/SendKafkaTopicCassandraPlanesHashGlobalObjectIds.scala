@@ -65,6 +65,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val sConf = new SparkConf(true)
         .set("spark.cassandra.connection.host", kCassandraHost)
         .set("spark.cassandra.output.consistency.level", consistencyLevel)
+        .set("spark.cassandra.dev.customFromDriver",  "com.datastax.spark.connector.types.DseTypeConverter")
         .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
