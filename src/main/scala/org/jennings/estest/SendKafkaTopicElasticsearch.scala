@@ -139,7 +139,7 @@ object SendKafkaTopicElasticsearch {
         (rdd, time) =>
           val count = rdd.count()
           if (count > 0) {
-            val msg = "Time %s: saving to DSE (%s total records)".format(time, count)
+            val msg = "Time %s: saving to ES (%s total records)".format(time, count)
             log.warn(msg)
             println(msg)
           }
@@ -182,6 +182,10 @@ object SendKafkaTopicElasticsearch {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
+    //val geohash = row(11)
+    //val sqrhash = row(12)
+    //val pntytrihash = row(13)
+    //val flattrihash = row(14)
 
     s"""{"id": "$id","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"geometry": [$longitude,$latitude]}"""
   }
