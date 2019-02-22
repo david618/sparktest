@@ -19,6 +19,7 @@
     <scala.dep.version>2.11</scala.dep.version>
     <es.version>6.6.0</es.version>
     <mainClass>org.jennings.estest.SendFileElasticsearchFile</mainClass>
+    <datastax.version>6.7.1</datastax.version>
   </properties>
 
   <dependencies>
@@ -42,11 +43,11 @@
       <artifactId>scala-parser-combinators_${scala.dep.version}</artifactId>
       <version>1.1.1</version>
     </dependency>
-<dependency>
-    <groupId>com.twitter</groupId>
-    <artifactId>chill_2.11</artifactId>
-    <version>0.9.3</version>
-</dependency>    
+    <dependency>
+        <groupId>com.twitter</groupId>
+        <artifactId>chill_2.11</artifactId>
+        <version>0.9.3</version>
+    </dependency>
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-swing_${scala.dep.version}</artifactId>
@@ -114,11 +115,23 @@
       <artifactId>spark-streaming_${scala.dep.version}</artifactId>
       <version>${spark.version}</version>
     </dependency>
+    <!-- DSE Spark connector Guava shaded -->
     <dependency>
-      <groupId>com.datastax.spark</groupId>
-      <artifactId>spark-cassandra-connector_${scala.dep.version}</artifactId>
-      <version>2.3.1</version>
+      <groupId>com.datastax.dse</groupId>
+      <artifactId>dse-byos_${scala.dep.version}</artifactId>
+      <version>${datastax.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.datastax.dse</groupId>
+      <artifactId>dse-spark-dependencies</artifactId>
+      <version>${datastax.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!--<dependency>-->
+      <!--<groupId>com.datastax.spark</groupId>-->
+      <!--<artifactId>spark-cassandra-connector_${scala.dep.version}</artifactId>-->
+      <!--<version>2.3.1</version>-->
+    <!--</dependency>-->
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.dep.version}</artifactId>
@@ -245,5 +258,10 @@
     </plugins>
   </build>
 
-
+  <repositories>
+    <repository>
+      <id>DataStax-Repo</id>
+      <url>https://repo.datastax.com/public-repos/</url>
+    </repository>
+  </repositories>
 </project>

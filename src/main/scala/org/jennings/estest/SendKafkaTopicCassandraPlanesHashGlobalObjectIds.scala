@@ -65,7 +65,8 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val sConf = new SparkConf(true)
         .set("spark.cassandra.connection.host", kCassandraHost)
         .set("spark.cassandra.output.consistency.level", consistencyLevel)
-        //.set("spark.cassandra.dev.customFromDriver", "com.datastax.spark.connector.types.DseTypeConverter")
+        .set("spark.cassandra.connection.factory", "com.datastax.bdp.spark.DseCassandraConnectionFactory")
+        .set("spark.cassandra.dev.customFromDriver", "com.datastax.spark.connector.types.DseTypeConverter")
         .setAppName(getClass.getSimpleName)
 
     val sc = new SparkContext(sparkMaster, "KafkaToDSE", sConf)
@@ -101,7 +102,7 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
                 secstodep int,
                 lon double,
                 lat double,
-                geom_4326 text,
+                geom_4326 'PointType',
                 esri_geohash_geohash_4326_12 text,
                 esri_geohash_square_102100_30 text,
                 esri_geohash_pointytriangle_102100_30 text,
@@ -323,14 +324,14 @@ object SendKafkaTopicCassandraPlanesHashGlobalObjectIds {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
-    val geometryText = "POINT (" + row(9) + " " + row(10) + ")"
+    val geometryObj = new com.datastax.driver.dse.geometry.Point(longitude, latitude)
     val geohash = row(11)
     val sqrhash = row(12)
     val pntytrihash = row(13)
     val flattrihash = row(14)
 
     // FIXME: why do we need to convert to tuples? why cant we store the data as a map?
-    val data = (globalid, objectId, plane_id, ts, speed, dist, bearing, rtid, orig, dest, secsToDep, latitude, longitude, geometryText, geohash, sqrhash, pntytrihash, flattrihash)
+    val data = (globalid, objectId, plane_id, ts, speed, dist, bearing, rtid, orig, dest, secsToDep, latitude, longitude, geometryObj, geohash, sqrhash, pntytrihash, flattrihash)
     //println(data)
     data
   }
