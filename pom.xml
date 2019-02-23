@@ -115,23 +115,6 @@
       <artifactId>spark-streaming_${scala.dep.version}</artifactId>
       <version>${spark.version}</version>
     </dependency>
-    <!-- DSE Spark connector Guava shaded -->
-    <dependency>
-      <groupId>com.datastax.dse</groupId>
-      <artifactId>dse-byos_${scala.dep.version}</artifactId>
-      <version>${datastax.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.datastax.dse</groupId>
-      <artifactId>dse-spark-dependencies</artifactId>
-      <version>${datastax.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <!--<dependency>-->
-      <!--<groupId>com.datastax.spark</groupId>-->
-      <!--<artifactId>spark-cassandra-connector_${scala.dep.version}</artifactId>-->
-      <!--<version>2.3.1</version>-->
-    <!--</dependency>-->
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.dep.version}</artifactId>
@@ -142,13 +125,46 @@
       <artifactId>commons-codec</artifactId>
       <version>1.10</version>
     </dependency>
+
+    <!-- DataStax -->
+
+    <!-- OSS DSE spark-cassandra connector -->
+    <!--
+    <dependency>
+      <groupId>com.datastax.spark</groupId>
+      <artifactId>spark-cassandra-connector_${scala.dep.version}</artifactId>
+      <version>${spark.version}</version>
+    </dependency>
+    -->
+
+    <!-- DSE Spark connector with Guava -->
+    <!--
+    <dependency>
+      <groupId>com.datastax.dse</groupId>
+      <artifactId>spark-connector</artifactId>
+      <version>${datastax.version}</version>
+    </dependency>
+    -->
+
+    <!-- DSE Spark connector Guava shaded -->
+    <dependency>
+      <groupId>com.datastax.dse</groupId>
+      <artifactId>dse-byos_${scala.dep.version}</artifactId>
+      <version>${datastax.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.datastax.dse</groupId>
+      <artifactId>dse-spark-dependencies</artifactId>
+      <version>${datastax.version}</version>
+      <scope>compile</scope>
+    </dependency>
+
   </dependencies>
 
   <build>
     <finalName>sparktest</finalName>
     <plugins>
       <!-- This compiles the Scala Code -->
-
       <plugin>
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
@@ -170,7 +186,6 @@
         </executions>
       </plugin>
 
-
       <!-- Set a JDK compiler level -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -182,12 +197,11 @@
         </configuration>
       </plugin>
 
-      <!-- Create big jar; contains all dependencies -->
-
+      <!-- Create uber jar; contains all dependencies -->
       <plugin>
-	<groupId>org.apache.maven.plugins</groupId>      
-	<artifactId>maven-assembly-plugin</artifactId>
-	<version>3.1.1</version>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.1.1</version>
         <configuration>
           <archive>
             <manifest>
@@ -197,6 +211,8 @@
           <descriptorRefs>
             <descriptorRef>jar-with-dependencies</descriptorRef>
           </descriptorRefs>
+          <finalName>${project.build.finalName}-full</finalName>
+          <appendAssemblyId>false</appendAssemblyId>
         </configuration>
         <executions>
           <execution>
@@ -210,14 +226,12 @@
       </plugin>
 
       <!-- Create small jar; dependencies reference in folder -->
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-	<artifactId>maven-jar-plugin</artifactId>
-	<version>3.1.1</version>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.1.1</version>
         <configuration>
           <!-- DO NOT include log4j.properties file in your Jar -->
-
           <excludes>
             <exclude>**/log4j.properties</exclude>
           </excludes>
@@ -232,7 +246,6 @@
       </plugin>
 
       <!-- Copy project dependency -->
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -246,14 +259,12 @@
             </goals>
             <configuration>
               <!-- exclude junit, we need runtime dependency only -->
-
               <includeScope>runtime</includeScope>
               <outputDirectory>${project.build.directory}/dependency-jars/</outputDirectory>
             </configuration>
           </execution>
         </executions>
       </plugin>
-
 
     </plugins>
   </build>
@@ -264,4 +275,5 @@
       <url>https://repo.datastax.com/public-repos/</url>
     </repository>
   </repositories>
+
 </project>
