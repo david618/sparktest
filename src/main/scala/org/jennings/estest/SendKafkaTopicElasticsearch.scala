@@ -26,10 +26,12 @@ import scala.util.Random
 object SendKafkaTopicElasticsearch {
 
   private val log = LogFactory.getLog(this.getClass)
+  private var objectId = 0
 
   // used to generate a random uuid
   private val RANDOM = new Random()
 
+  // constants
   val DEFAULT_TYPE_NAME = "_doc"
 
 
@@ -94,10 +96,10 @@ object SendKafkaTopicElasticsearch {
       .set("es.index.auto.create", "true")
       .set("es.nodes", esServer)
       .set("es.port", esPort)
-      // Without the following it would not create the index on single-node mode
+      // without the following it would not create the index on single-node mode
       .set("es.nodes.discovery", "false")
       .set("es.nodes.data.only", "false")
-      // Without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
+      // without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
       .set("es.nodes.wan.only", "true")
       .setAppName(getClass.getSimpleName)
       .set("es.net.http.auth.user", esUsername)
@@ -131,7 +133,7 @@ object SendKafkaTopicElasticsearch {
     val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
     // convert csv lines to ES JSON
-    val dataStream = stream.map(line => csvToJson(line))
+    val dataStream = stream.map(line => adaptCsvToPlane(line))
 
     // debug
     if (kDebug) {
@@ -147,9 +149,9 @@ object SendKafkaTopicElasticsearch {
     }
 
     dataStream.foreachRDD { rdd =>
-//      rdd.foreach(a => {
-//        println(a)
-//      })
+      // rdd.foreach(a => {
+      //   println(a)
+      // })
       EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
     }
 
@@ -161,17 +163,16 @@ object SendKafkaTopicElasticsearch {
     ssc.awaitTermination()
   }
 
-  /**
-    * Adapt to the very specific Safegraph JSON Schema
-    */
-  private def csvToJson(csvLine: String): String = {
+  private def adaptCsvToPlane(csvLine: String): String = {
+    objectId = objectId + 1
     val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
 
     // parse out the line
     val rows = objectMapper.readValues[Array[String]](csvLine)
     val row = rows.nextValue()
 
-    val id = uuid.toString // NOTE: This is to ensure unique records
+    val globalid = uuid.toString
+    val planeid = row(0)
     val ts = row(1).toLong
     val speed = row(2).toDouble
     val dist = row(3).toDouble
@@ -182,12 +183,13 @@ object SendKafkaTopicElasticsearch {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
-    //val geohash = row(11)
-    //val sqrhash = row(12)
-    //val pntytrihash = row(13)
-    //val flattrihash = row(14)
+    val dseGeometry = new com.datastax.driver.dse.geometry.Point(longitude, latitude)
+    //val geohashEnconding = row(11)
+    val squareEncoding = row(12)
+    val pointyTriangleEncoding = row(13)
+    val flatTriangleEncoding = row(14)
 
-    s"""{"id": "$id","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"geometry": [$longitude,$latitude]}"""
+    s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"geometry": [$longitude,$latitude]}"""
   }
 
   // create the kafka stream
@@ -284,7 +286,14 @@ object SendKafkaTopicElasticsearch {
       s"""
          |"$DEFAULT_TYPE_NAME": {
          |  "properties": {
-         |    "id": {
+         |    "globalid": {
+         |      "type": "keyword"
+         |    },
+         |    "objectid": {
+         |      "type": "long"
+         |    },
+         |    },
+         |    "planeid": {
          |      "type": "keyword"
          |    },
          |    "ts": {
