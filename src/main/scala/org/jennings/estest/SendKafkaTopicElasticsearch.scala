@@ -183,13 +183,15 @@ object SendKafkaTopicElasticsearch {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
-    val dseGeometry = new com.datastax.driver.dse.geometry.Point(longitude, latitude)
-    //val geohashEnconding = row(11)
+
+    val geohashEnconding = row(11)
     val squareEncoding = row(12)
     val pointyTriangleEncoding = row(13)
     val flatTriangleEncoding = row(14)
 
-    s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"geometry": [$longitude,$latitude]}"""
+    val esGeoPoint = s"""[$longitude,$latitude]"""
+
+    s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"geometry": $esGeoPoint}"""
   }
 
   // create the kafka stream
