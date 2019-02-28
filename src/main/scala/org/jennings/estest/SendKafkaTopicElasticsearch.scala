@@ -25,7 +25,7 @@ import scala.util.Random
 
 object SendKafkaTopicElasticsearch {
 
-  private val log = LogFactory.getLog(this.getClass)
+  //private val log = LogFactory.getLog(getClass)
   private var objectId = 0
 
   // used to generate a random uuid
@@ -93,7 +93,7 @@ object SendKafkaTopicElasticsearch {
 
 
     val sConf = new SparkConf(true)
-      .set("es.index.auto.create", "true")
+      //.set("es.index.auto.create", "true")
       .set("es.nodes", esServer)
       .set("es.port", esPort)
       // without the following it would not create the index on single-node mode
@@ -115,12 +115,12 @@ object SendKafkaTopicElasticsearch {
     // The following delete and create an Elasticsearch Index; otherwise it assumes index already exists
     if (recreateIndex) {
       println(s"We are recreating the index: $indexName")
-      log.info(s"We are recreating the index: $indexName")
+      //log.info(s"We are recreating the index: $indexName")
       deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
       createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
     }
 
-    log.info("Done initialization, ready to start streaming...")
+    //log.info("Done initialization, ready to start streaming...")
     println("Done initialization, ready to start streaming...")
 
     // the streaming context
@@ -142,7 +142,7 @@ object SendKafkaTopicElasticsearch {
           val count = rdd.count()
           if (count > 0) {
             val msg = "Time %s: saving to ES (%s total records)".format(time, count)
-            log.warn(msg)
+            //log.warn(msg)
             println(msg)
           }
       }
@@ -155,7 +155,7 @@ object SendKafkaTopicElasticsearch {
       EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
     }
 
-    log.info("Stream is starting now...")
+    //log.info("Stream is starting now...")
     println("Stream is starting now...")
 
     // start the stream
@@ -212,7 +212,7 @@ object SendKafkaTopicElasticsearch {
     unifiedStream
   }
 
-  private def deleteIndex(esServer: String, esPort: String, username: String, password: String, indexName: String): Boolean = {
+  def deleteIndex(esServer: String, esPort: String, username: String, password: String, indexName: String): Boolean = {
     val client = HttpClients.createDefault()
     try {
       val urlStr = s"http://$esServer:$esPort/$indexName"
@@ -237,10 +237,10 @@ object SendKafkaTopicElasticsearch {
     }
   }
 
-  private def createIndex(esServer: String, esPort: String, username: String, password: String, indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): Boolean = {
+  def createIndex(esServer: String, esPort: String, username: String, password: String, indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): Boolean = {
 
-    // create the index
-    val indexJson = getIndexJson(indexName, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
+    val aliasName = s"${indexName}_alias"
+    val indexJson = getIndexJson(indexName, aliasName, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
     //println(indexJson)
     val client = HttpClients.createDefault()
     try {
@@ -271,19 +271,7 @@ object SendKafkaTopicElasticsearch {
     }
   }
 
-  private def getIndexJson(indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): String = {
-    val indexSettingsJson =
-      s"""
-         |{
-         |  "index": {
-         |    "number_of_shards": "$numOfShards",
-         |    "number_of_replicas": "$replicationFactor",
-         |    "refresh_interval": "$refreshInterval",
-         |    "max_result_window": $maxRecordCount
-         |  }
-         |}
-      """.stripMargin
-
+  private def getDataIndexMappingJson(): String = {
     val indexMappingJson =
       s"""
          |"$DEFAULT_TYPE_NAME": {
@@ -293,7 +281,6 @@ object SendKafkaTopicElasticsearch {
          |    },
          |    "objectid": {
          |      "type": "long"
-         |    },
          |    },
          |    "planeid": {
          |      "type": "keyword"
@@ -336,18 +323,58 @@ object SendKafkaTopicElasticsearch {
          |}
      """.stripMargin
 
+    indexMappingJson
+  }
+
+  private def getIndexJson(indexName: String, aliasName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): String = {
+    val indexSettingsJson =
+      s"""
+         |{
+         |  "index": {
+         |    "number_of_shards": "$numOfShards",
+         |    "number_of_replicas": "$replicationFactor",
+         |    "refresh_interval": "$refreshInterval",
+         |    "max_result_window": $maxRecordCount
+         |  }
+         |}
+      """.stripMargin
+
+    val indexMappingJson = getDataIndexMappingJson()
+
     val indexJson =
       s"""
          |{
          |  "settings": $indexSettingsJson,
          |  "mappings": {
          |    $indexMappingJson
+         |  },
+         |  "aliases": {
+         |    "$aliasName": {}
          |  }
          |}
       """.stripMargin
 
-
     indexJson
+  }
+
+  private def getTemplateMappingJson(aliasName: String,
+                                     templateIndexPattern: String,
+                                     indexSettingsJson: String,
+                                     indexMappingJson: String): String = {
+
+    // create the index template (must be lower cased)
+    s"""
+       |{
+       |  "index_patterns": ["$templateIndexPattern"],
+       |  "settings": $indexSettingsJson,
+       |  "mappings": {
+       |    $indexMappingJson
+       |  },
+       |  "aliases": {
+       |    "$aliasName": {}
+       |  }
+       |}
+    """.stripMargin
   }
 
   private def getHttpResponseAsString(response: CloseableHttpResponse, request: HttpUriRequest): HttpResponse = {

@@ -7,6 +7,8 @@
   <groupId>org.jennings</groupId>
   <artifactId>sparktest</artifactId>
   <version>1.0-SNAPSHOT</version>
+  <name>Sparktest</name>
+  <description>Sparktest</description>
   <packaging>jar</packaging>
 
   <properties>
@@ -20,6 +22,8 @@
     <es.version>6.6.1</es.version>
     <mainClass>org.jennings.estest.SendFileElasticsearchFile</mainClass>
     <datastax.version>6.7.1</datastax.version>
+    <junit.version>4.12</junit.version>
+    <scala.test.version>2.2.6</scala.test.version>
   </properties>
 
   <dependencies>
@@ -157,8 +161,29 @@
       <artifactId>dse-spark-dependencies</artifactId>
       <version>${datastax.version}</version>
       <scope>compile</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>logback-classic</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>log4j-over-slf4j</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
+    <!-- Test -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scalatest</groupId>
+      <artifactId>scalatest_${scala.dep.version}</artifactId>
+      <version>${scala.test.version}</version>
+    </dependency>
   </dependencies>
 
   <build>
@@ -166,21 +191,84 @@
     <plugins>
       <!-- This compiles the Scala Code -->
       <plugin>
-        <groupId>org.scala-tools</groupId>
-        <artifactId>maven-scala-plugin</artifactId>
-        <version>2.15.2</version>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+        <version>3.4.4</version>
+        <configuration>
+          <checkMultipleScalaVersions>false</checkMultipleScalaVersions>
+          <recompileMode>incremental</recompileMode>
+          <args>
+            <arg>-target:jvm-1.8</arg>
+          </args>
+          <jvmArgs>
+            <jvmArg>-Xss1024k</jvmArg>
+            <jvmArg>-Xms64m</jvmArg>
+            <jvmArg>-Xmx2048m</jvmArg>
+          </jvmArgs>
+        </configuration>
         <executions>
           <execution>
-            <id>compile</id>
+            <id>1</id>
+            <phase>compile</phase>
             <goals>
               <goal>compile</goal>
               <goal>testCompile</goal>
             </goals>
           </execution>
           <execution>
+            <id>2</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>testCompile</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>3</id>
             <phase>process-resources</phase>
             <goals>
               <goal>compile</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/main/scala</source>
+                <source>src/main/java</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.22.1</version>
+        <configuration>
+          <includes>
+            <include>**/*Test*.java</include>
+          </includes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>3.0.1</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar</goal>
             </goals>
           </execution>
         </executions>
