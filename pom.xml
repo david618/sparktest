@@ -208,7 +208,7 @@
         </configuration>
         <executions>
           <execution>
-            <id>1</id>
+            <id>compile</id>
             <phase>compile</phase>
             <goals>
               <goal>compile</goal>
@@ -216,14 +216,14 @@
             </goals>
           </execution>
           <execution>
-            <id>2</id>
+            <id>test-compile</id>
             <phase>test-compile</phase>
             <goals>
               <goal>testCompile</goal>
             </goals>
           </execution>
           <execution>
-            <id>3</id>
+            <id>process-resources</id>
             <phase>process-resources</phase>
             <goals>
               <goal>compile</goal>
