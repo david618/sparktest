@@ -33,7 +33,7 @@ class ElasticsearchTester extends FunSuite {
 
   test ("adaptCsvToPlane") {
     val csvLine = s"""0,1506957079575,240.25,5024.32,-70.72,1,"Mielec Airport","Frank Pais International Airport",-1,-31.88592,49.21297,AAA,BBB,CCC,DDD"""
-    val json = SendKafkaTopicElasticsearch.adaptCsvToPlane(csvLine)
+    val json = SendKafkaTopicElasticsearch.adaptCsvToPlane(csvLine, writeGeohash = true)
     assert(json != null)
   }
 
