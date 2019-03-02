@@ -20,4 +20,16 @@ class ElasticsearchTester extends FunSuite {
     assert(success == true)
   }
 
+  test("test delete index") {
+    val esServer = "localhost"
+    val esPort = "9200"
+    val esUsername = "-"
+    val esPassword = "-"
+    val indexName = "planes4"
+
+    val success = SendKafkaTopicElasticsearch.deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
+    assert(success == true)
+  }
+
+
 }

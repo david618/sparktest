@@ -61,8 +61,8 @@ object SendKafkaTopicElasticsearch {
             " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +   // 6-10
             " [recreateTable] [debug]" +                                                                // 11-12
             " <latest=true>"  +                                                                         // 13
-            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>") + // 14-17
-            " <writeGeohash=true>"                                                                      // 18
+            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>" +  // 14-17
+            " <writeGeohash=true>")                                                                     // 18
       System.exit(1)
     }
 
@@ -191,7 +191,7 @@ object SendKafkaTopicElasticsearch {
     //val squareEncoding = row(12)
     //val pointyTriangleEncoding = row(13)
     //val flatTriangleEncoding = row(14)
-    val (squareEncoding, pointyTriangleEncoding, flatTriangleEncoding) = if (writeGeohash) {
+    val (squareEncoding, pointyTriangleEncoding, flatTriangleEncoding) = if (writeGeohash && row.length > 14) {
       (row(12), row (13), row(14))
     } else {
       ("", "", "")
