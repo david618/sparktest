@@ -34,6 +34,7 @@ object SendKafkaTopicElasticsearch {
   // constants
   val DEFAULT_TYPE_NAME = "_doc"
 
+  var logOnce = true
 
   // initialized the object mapper / text parser only once
   private val objectMapper = {
@@ -61,8 +62,7 @@ object SendKafkaTopicElasticsearch {
             " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +   // 6-10
             " [recreateTable] [debug]" +                                                                // 11-12
             " <latest=true>"  +                                                                         // 13
-            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>" +  // 14-17
-            " <writeGeohash=true>")                                                                     // 18
+            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>")   // 14-17
       System.exit(1)
     }
 
@@ -92,7 +92,6 @@ object SendKafkaTopicElasticsearch {
     val maxRecordCount: Int = if (args.length > 16) args(16).toInt else 10000
     val replicationFactor: Int = if (args.length > 17) args(17).toInt else 0
 
-    val writeGeohash = if (args.length > 18) args(18).toBoolean else true
 
     val sConf = new SparkConf(true)
       //.set("es.index.auto.create", "true")
@@ -135,7 +134,7 @@ object SendKafkaTopicElasticsearch {
     val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
     // convert csv lines to ES JSON
-    val dataStream = stream.map(line => adaptCsvToPlane(line, writeGeohash))
+    val dataStream = stream.map(line => adaptCsvToPlane(line))
 
     // debug
     if (kDebug) {
@@ -165,7 +164,7 @@ object SendKafkaTopicElasticsearch {
     ssc.awaitTermination()
   }
 
-  private def adaptCsvToPlane(csvLine: String, writeGeohash: Boolean): String = {
+  private def adaptCsvToPlane(csvLine: String): String = {
     objectId = objectId + 1
     val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
 
@@ -188,16 +187,21 @@ object SendKafkaTopicElasticsearch {
     val esGeoPoint = s"""[$longitude,$latitude]"""
 
     //val geohashEnconding = row(11)
-    //val squareEncoding = row(12)
-    //val pointyTriangleEncoding = row(13)
-    //val flatTriangleEncoding = row(14)
-    val (squareEncoding, pointyTriangleEncoding, flatTriangleEncoding) = if (writeGeohash && row.length > 14) {
-      (row(12), row (13), row(14))
-    } else {
-      ("", "", "")
+    val squareEncoding = row(12)
+    val pointyTriangleEncoding = row(13)
+    val flatTriangleEncoding = row(14)
+
+    val json = s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"square": $squareEncoding,"pointy": $pointyTriangleEncoding,"flat": $flatTriangleEncoding,"geometry": $esGeoPoint}"""
+
+    if (logOnce) {
+      println("-------")
+      println(s"rowLength: ${row.length}")
+      println(json)
+      logOnce = false
+      println("-------")
     }
 
-    s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"square": $squareEncoding,"pointy": $pointyTriangleEncoding,"flat": $flatTriangleEncoding,"geometry": $esGeoPoint}"""
+    json
   }
 
   // create the kafka stream
