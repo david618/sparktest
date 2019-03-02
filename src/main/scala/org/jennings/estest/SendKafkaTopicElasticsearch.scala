@@ -150,10 +150,18 @@ object SendKafkaTopicElasticsearch {
     }
 
     dataStream.foreachRDD { rdd =>
-      // rdd.foreach(a => {
-      //   println(a)
-      // })
-      EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
+      try {
+
+        // rdd.foreach(a => {
+        //   println(a)
+        // })
+        EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
+      } catch {
+        case error: Throwable =>
+          println(s"***** rdd.saveJsonToEs($indexName/$DEFAULT_TYPE_NAME) caught the following exception: *****")
+          error.printStackTrace()
+          println(s"***** dropped the current rdd.saveJsonToEs batch (count: ${rdd.count}) and continue with the next batch... *****")
+      }
     }
 
     //log.info("Stream is starting now...")
