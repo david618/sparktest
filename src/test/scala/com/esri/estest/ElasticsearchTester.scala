@@ -5,7 +5,7 @@ import org.scalatest.FunSuite
 
 class ElasticsearchTester extends FunSuite {
 
-  test("test create index") {
+  test("createIndex") {
     val esServer = "localhost"
     val esPort = "9200"
     val esUsername = "-"
@@ -20,7 +20,7 @@ class ElasticsearchTester extends FunSuite {
     assert(success == true)
   }
 
-  test("test delete index") {
+  test("deleteIndex") {
     val esServer = "localhost"
     val esPort = "9200"
     val esUsername = "-"
@@ -31,5 +31,10 @@ class ElasticsearchTester extends FunSuite {
     assert(success == true)
   }
 
+  test ("adaptCsvToPlane") {
+    val csvLine = s"""0,1506957079575,240.25,5024.32,-70.72,1,"Mielec Airport","Frank Pais International Airport",-1,-31.88592,49.21297,AAA,BBB,CCC,DDD"""
+    val json = SendKafkaTopicElasticsearch.adaptCsvToPlane(csvLine)
+    assert(json != null)
+  }
 
 }

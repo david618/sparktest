@@ -164,7 +164,7 @@ object SendKafkaTopicElasticsearch {
     ssc.awaitTermination()
   }
 
-  private def adaptCsvToPlane(csvLine: String): String = {
+  def adaptCsvToPlane(csvLine: String): String = {
     objectId = objectId + 1
     val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
 
@@ -191,7 +191,7 @@ object SendKafkaTopicElasticsearch {
     val pointyTriangleEncoding = row(13)
     val flatTriangleEncoding = row(14)
 
-    val json = s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"square": $squareEncoding,"pointy": $pointyTriangleEncoding,"flat": $flatTriangleEncoding,"geometry": $esGeoPoint}"""
+    val json = s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"square": "$squareEncoding","pointy": "$pointyTriangleEncoding","flat": "$flatTriangleEncoding","geometry": $esGeoPoint}"""
 
     if (logOnce) {
       println("-------")
