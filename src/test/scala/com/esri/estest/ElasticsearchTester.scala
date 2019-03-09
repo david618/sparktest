@@ -41,4 +41,13 @@ class ElasticsearchTester extends FunSuite {
     assert(json2 != null)
   }
 
+  test ("parseEsServer") {
+    val esNodesMultiple = "a104,a105,a106,a107,a108,a109,a110,a101,a102,a103"
+    val esServer1 = SendKafkaTopicElasticsearch.parseEsServer(esNodesMultiple)
+    assert(esServer1.equals("a104"))
+
+    val esNodesSingle = "a104"
+    val esServer2 = SendKafkaTopicElasticsearch.parseEsServer(esNodesSingle)
+    assert(esServer2.equals("a104"))
+  }
 }

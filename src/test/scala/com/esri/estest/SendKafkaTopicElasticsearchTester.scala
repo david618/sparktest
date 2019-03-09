@@ -13,27 +13,26 @@ object SendKafkaTopicElasticsearchTester extends App {
   val kafkaTopic = "planes9"
   val kafkaThreads = "1"
 
-  val esServer = "localhost"  // "a101"
+  val esNodes = "localhost"  // "a104,a105,a106,a107,a108,a109,a110,a101,a102,a103"
   val esPort = "9200"
-  val esUsername = ""
-  val esPassword = ""
-
+  val esUsername = "-"
+  val esPassword = "-"
   val esNumOfShards = "1"
+  val esRecreateIndex = true.toString
 
-  val recreateTable = true.toString
   val debug = true.toString
   val latest = true.toString
 
   val indexName = "planes"
-  val refreshInterval= "60s"
-  val maxRecordCount="10000"
-  val replicationFactor="0"
+  val refreshInterval = "60s"
+  val maxRecordCount = "10000"
+  val replicationFactor = "0"
 
   val parameters = Array(
     sparkMaster, emitIntervalMS,
     kafkaBrokers, kafkaConsumerGroup, kafkaTopic, kafkaThreads,
-    esServer, esPort, esUsername, esPassword, esNumOfShards,
-    recreateTable, debug,
+    esNodes, esPort, esUsername, esPassword, esNumOfShards,
+    esRecreateIndex, debug,
     latest,
     indexName, refreshInterval, maxRecordCount, replicationFactor
   )

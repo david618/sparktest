@@ -57,12 +57,12 @@ object SendKafkaTopicElasticsearch {
     if (args.length < 13) {
       System.err.println(
         "Usage: SendKafkaTopicElasticsearch" +
-            " [spkMaster] [emitIntervalMS]" +                                                           // 0-1
-            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                        // 2-5
-            " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +   // 6-10
-            " [recreateTable] [debug]" +                                                                // 11-12
-            " <latest=true>" +                                                                          // 13
-            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>")   // 14-17
+            " [spkMaster] [emitIntervalMS]" +                                                         // 0-1
+            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                      // 2-5
+            " [esNodes] [esPort] [esUsername] [esPassword] [esNumOfShards] [esRecreateIndex] " +      // 6-11
+            " [debug]" +                                                                              // 12
+            " <latest=true>" +                                                                        // 13
+            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>") // 14-17
       System.exit(1)
     }
 
@@ -75,13 +75,13 @@ object SendKafkaTopicElasticsearch {
     val kTopics: String = args(4)
     val kThreads: String = args(5)
 
-    val esServer: String = args(6)
+    val esNodes: String = args(6)
     val esPort: String = args(7)
     val esUsername: String = args(8)
     val esPassword: String = args(9)
     val esNumOfShards: Int = args(10).toInt
+    val esRecreateIndex: Boolean = args(11).toBoolean
 
-    val recreateIndex: Boolean = args(11).toBoolean
     val kDebug: Boolean = args(12).toBoolean
 
     // optional arguments
@@ -94,17 +94,21 @@ object SendKafkaTopicElasticsearch {
 
 
     val sConf = new SparkConf(true)
+        .setAppName(getClass.getSimpleName)
+        .set("es.nodes", esNodes)
+        .set("es.port", esPort)
+        .set("es.net.http.auth.user", esUsername)
+        .set("es.net.http.auth.pass", esPassword)
+
       //.set("es.index.auto.create", "true")
-      .set("es.nodes", esServer)
-      .set("es.port", esPort)
+
       // without the following it would not create the index on single-node mode
-      .set("es.nodes.discovery", "false")
-      .set("es.nodes.data.only", "false")
+      //.set("es.nodes.discovery", "false")
+      //.set("es.nodes.data.only", "false")
+
       // without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
-      .set("es.nodes.wan.only", "true")
-      .setAppName(getClass.getSimpleName)
-      .set("es.net.http.auth.user", esUsername)
-      .set("es.net.http.auth.pass", esPassword)
+      //.set("es.nodes.wan.only", "true")
+
 
     val sc = new SparkContext(sparkMaster, "KafkaToElastic", sConf)
 
@@ -113,13 +117,15 @@ object SendKafkaTopicElasticsearch {
     println(s"***")
 
 
-    // The following delete and create an Elasticsearch Index; otherwise it assumes index already exists
-    if (recreateIndex) {
-      println(s"We are recreating the index: $indexName")
-      //log.info(s"We are recreating the index: $indexName")
+    // The following deletes and creates an Elasticsearch Index, otherwise assumes the index already exists
+    if (esRecreateIndex) {
+      val esServer = parseEsServer(esNodes)
+      println(s"Recreating the index '$indexName' using ES node '$esServer' ...")
+      //log.info(s"Recreating the index '$indexName' using ES node '$esServer' ...")
       deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
       createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
     }
+
 
     //log.info("Done initialization, ready to start streaming...")
     println("Done initialization, ready to start streaming...")
@@ -218,6 +224,15 @@ object SendKafkaTopicElasticsearch {
     }
     val unifiedStream = ssc.union(kafkaStreams)
     unifiedStream
+  }
+
+  def parseEsServer(esNodes: String): String = {
+    val endIndex = esNodes.indexOf(",")
+    if (endIndex == -1) {
+      esNodes
+    } else {
+      esNodes.substring(0, endIndex)
+    }
   }
 
   def deleteIndex(esServer: String, esPort: String, username: String, password: String, indexName: String): Boolean = {
