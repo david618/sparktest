@@ -191,7 +191,7 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
 //    val pointyTriangleEncoding = row(13)
 //    val flatTriangleEncoding = row(14)
 
-    val json = s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"---geo_hash---": "$esGeoPoint","geometry": $esGeoPoint}"""
+    val json = s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"---geo_hash---": $esGeoPoint,"geometry": $esGeoPoint}"""
 
     if (logOnce) {
       println("-------")
