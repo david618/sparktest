@@ -57,12 +57,11 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     if (args.length < 13) {
       System.err.println(
         "Usage: SendKafkaTopicElasticsearch" +
-            " [spkMaster] [emitIntervalMS]" +                                                           // 0-1
-            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                        // 2-5
-            " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +   // 6-10
-            " [recreateTable] [debug]" +                                                                // 11-12
-            " <latest=true>"  +                                                                         // 13
-            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>")   // 14-17
+            " [spkMaster] [emitIntervalMS]" +                                                                             // 0-1
+            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                                          // 2-5
+            " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +                     // 6-10
+            " [recreateTable] [debug] <latest=true>" +                                                                    // 11-13
+            " <indexName=planes> <Has EsriGeohash> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>")   // 14-18
       System.exit(1)
     }
 
@@ -88,10 +87,11 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     val kLatest: Boolean = if (args.length > 13) args(13).toBoolean else true
 
     val indexName: String = if (args.length > 14) args(14) else "planes"
-    val refreshInterval: String = if (args.length > 15) args(15) else "60s"
-    val maxRecordCount: Int = if (args.length > 16) args(16).toInt else 10000
-    val replicationFactor: Int = if (args.length > 17) args(17).toInt else 0
+    val hasEsriGeohash: Boolean = if (args.length > 15) args(15).toBoolean else false
 
+    val refreshInterval: String = if (args.length > 16) args(16) else "60s"
+    val maxRecordCount: Int = if (args.length > 17) args(17).toInt else 10000
+    val replicationFactor: Int = if (args.length > 18) args(18).toInt else 0
 
     val sConf = new SparkConf(true)
       //.set("es.index.auto.create", "true")
@@ -134,7 +134,7 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
     // convert csv lines to ES JSON
-    val dataStream = stream.map(line => adaptCsvToPlane(line))
+    val dataStream = stream.map(line => adaptCsvToPlane(line, hasEsriGeohash))
 
     // debug
     if (kDebug) {
@@ -164,7 +164,7 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     ssc.awaitTermination()
   }
 
-  def adaptCsvToPlane(csvLine: String): String = {
+  def adaptCsvToPlane(csvLine: String, hasEsriGeohash: Boolean): String = {
     objectId = objectId + 1
     val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
 
@@ -191,7 +191,13 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
 //    val pointyTriangleEncoding = row(13)
 //    val flatTriangleEncoding = row(14)
 
-    val json = s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"---geo_hash---": $esGeoPoint,"geometry": $esGeoPoint}"""
+    val json = if (hasEsriGeohash) {
+      s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"---geo_hash---": $esGeoPoint,"geometry": $esGeoPoint}"""
+    } else {
+      s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"geometry": $esGeoPoint}"""
+
+    }
+
 
     if (logOnce) {
       println("-------")
