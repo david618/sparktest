@@ -56,7 +56,7 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
 
     if (args.length < 13) {
       System.err.println(
-        "Usage: SendKafkaTopicElasticsearch" +
+        "Usage: SendKafkaTopicElasticsearchWithEsriGeohash" +
             " [spkMaster] [emitIntervalMS]" +                                                                             // 0-1
             " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                                          // 2-5
             " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +                     // 6-10
