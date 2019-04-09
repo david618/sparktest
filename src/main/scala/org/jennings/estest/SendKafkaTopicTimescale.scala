@@ -83,23 +83,24 @@ object SendKafkaTopicTimescale {
       statement.execute(s"""
       CREATE TABLE IF NOT EXISTS $schema.$table
       (
-        objectid    BIGSERIAL,
-        id          UUID,
-        ts          TIMESTAMP NOT NULL,
-        speed       DOUBLE PRECISION,
-        dist        DOUBLE PRECISION,
-        bearing     DOUBLE PRECISION,
-        rtid        INTEGER,
-        orig        TEXT,
-        dest        TEXT,
-        secstodep   INTEGER,
-        lon         DOUBLE PRECISION,
-        lat         DOUBLE PRECISION,
-        geohash     TEXT,
-        sqrhash     TEXT,
-        pntytrihash TEXT,
-        flattrihash TEXT,
-        geometry    GEOMETRY(POINT, 4326)
+        objectid bigserial NOT NULL ,
+        globalid uuid NOT NULL,
+        ts timestamp without time zone NOT NULL,
+        speed double precision,
+        dist double precision,
+        bearing double precision,
+        rtid integer,
+        orig text,
+        dest text,
+        secstodep integer,
+        geo_hash text,
+        longitude double precision,
+        latitude double precision,
+        esri_geohash_geohash_4326_12 text,
+        esri_geohash_square_102100_26 text,
+        esri_geohash_flattriangle_102100_26 text,
+        esri_geohash_pointytriangle_102100_26 text,
+        geometry geometry
       )
       TABLESPACE REALTIME
           """.stripMargin
@@ -120,12 +121,8 @@ object SendKafkaTopicTimescale {
         statement.execute(s"create index on $schema.$table (orig, ts DESC)")
         statement.execute(s"create index on $schema.$table (dest, ts DESC)")
         statement.execute(s"create index on $schema.$table (ts DESC, secstodep)")
-        statement.execute(s"create index on $schema.$table (ts DESC, lon)")
-        statement.execute(s"create index on $schema.$table (ts DESC, lat)")
-        statement.execute(s"create index on $schema.$table (geohash, ts DESC)")
-        statement.execute(s"create index on $schema.$table (sqrhash, ts DESC)")
-        statement.execute(s"create index on $schema.$table (pntytrihash, ts DESC)")
-        statement.execute(s"create index on $schema.$table (flattrihash, ts DESC)")
+        statement.execute(s"create index on $schema.$table (ts DESC, longitude)")
+        statement.execute(s"create index on $schema.$table (ts DESC, latitude)")
 
       }
       statement.execute(s"create index on $schema.$table using GIST(geometry)")
@@ -169,7 +166,7 @@ object SendKafkaTopicTimescale {
 
           val cachedConnection = ConnectionPool.getConnection(url, properties)
           val copyManager = cachedConnection.copyManager
-          val copySql = s"""COPY $schema.$table (id,ts,speed,dist,bearing,rtid,orig,dest,secstodep,lon,lat,geohash,sqrhash,pntytrihash,flattrihash,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
+          val copySql = s"""COPY $schema.$table (globalid,ts,speed,dist,bearing,rtid,orig,dest,secstodep,longitude,latitude,esri_geohash_geohash_4326_12,esri_geohash_square_102100_26,esri_geohash_pointytriangle_102100_26,esri_geohash_flattriangle_102100_26,geometry ) FROM STDIN WITH (NULL 'null', FORMAT CSV, DELIMITER ',')"""
 
           val transactionStart = System.currentTimeMillis()
           val stream = rddToInputStream(iterator)
