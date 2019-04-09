@@ -23,7 +23,7 @@ import org.elasticsearch.spark.rdd.EsSpark
 import scala.util.Random
 
 
-object SendKafkaTopicElasticsearch {
+object SendKafkaTopicElasticsearchWithEsriGeohash {
 
   //private val log = LogFactory.getLog(getClass)
   private var objectId = 0
@@ -56,13 +56,12 @@ object SendKafkaTopicElasticsearch {
 
     if (args.length < 13) {
       System.err.println(
-        "Usage: SendKafkaTopicElasticsearch" +
-            " [spkMaster] [emitIntervalMS]" +                                                         // 0-1
-            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                      // 2-5
-            " [esNodes] [esPort] [esUsername] [esPassword] [esNumOfShards] [esRecreateIndex] " +      // 6-11
-            " [debug]" +                                                                              // 12
-            " <latest=true>" +                                                                        // 13
-            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>") // 14-17
+        "Usage: SendKafkaTopicElasticsearchWithEsriGeohash" +
+            " [spkMaster] [emitIntervalMS]" +                                                                             // 0-1
+            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                                          // 2-5
+            " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +                     // 6-10
+            " [recreateTable] [debug] <latest=true>" +                                                                    // 11-13
+            " <indexName=planes> <Has EsriGeohash> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>")   // 14-18
       System.exit(1)
     }
 
@@ -75,40 +74,37 @@ object SendKafkaTopicElasticsearch {
     val kTopics: String = args(4)
     val kThreads: String = args(5)
 
-    val esNodes: String = args(6)
+    val esServer: String = args(6)
     val esPort: String = args(7)
     val esUsername: String = args(8)
     val esPassword: String = args(9)
     val esNumOfShards: Int = args(10).toInt
-    val esRecreateIndex: Boolean = args(11).toBoolean
 
+    val recreateIndex: Boolean = args(11).toBoolean
     val kDebug: Boolean = args(12).toBoolean
 
     // optional arguments
     val kLatest: Boolean = if (args.length > 13) args(13).toBoolean else true
 
     val indexName: String = if (args.length > 14) args(14) else "planes"
-    val refreshInterval: String = if (args.length > 15) args(15) else "60s"
-    val maxRecordCount: Int = if (args.length > 16) args(16).toInt else 10000
-    val replicationFactor: Int = if (args.length > 17) args(17).toInt else 0
+    val hasEsriGeohash: Boolean = if (args.length > 15) args(15).toBoolean else false
 
+    val refreshInterval: String = if (args.length > 16) args(16) else "60s"
+    val maxRecordCount: Int = if (args.length > 17) args(17).toInt else 10000
+    val replicationFactor: Int = if (args.length > 18) args(18).toInt else 0
 
     val sConf = new SparkConf(true)
-        .setAppName(getClass.getSimpleName)
-        .set("es.nodes", esNodes)
-        .set("es.port", esPort)
-        .set("es.net.http.auth.user", esUsername)
-        .set("es.net.http.auth.pass", esPassword)
-
       //.set("es.index.auto.create", "true")
-
+      .set("es.nodes", esServer)
+      .set("es.port", esPort)
       // without the following it would not create the index on single-node mode
-      //.set("es.nodes.discovery", "false")
-      //.set("es.nodes.data.only", "false")
-
+      .set("es.nodes.discovery", "false")
+      .set("es.nodes.data.only", "false")
       // without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
-      //.set("es.nodes.wan.only", "true")
-
+      .set("es.nodes.wan.only", "true")
+      .setAppName(getClass.getSimpleName)
+      .set("es.net.http.auth.user", esUsername)
+      .set("es.net.http.auth.pass", esPassword)
 
     val sc = new SparkContext(sparkMaster, "KafkaToElastic", sConf)
 
@@ -117,15 +113,13 @@ object SendKafkaTopicElasticsearch {
     println(s"***")
 
 
-    // The following deletes and creates an Elasticsearch Index, otherwise assumes the index already exists
-    if (esRecreateIndex) {
-      val esServer = parseEsServer(esNodes)
-      println(s"Recreating the index '$indexName' using ES node '$esServer' ...")
-      //log.info(s"Recreating the index '$indexName' using ES node '$esServer' ...")
+    // The following delete and create an Elasticsearch Index; otherwise it assumes index already exists
+    if (recreateIndex) {
+      println(s"We are recreating the index: $indexName")
+      //log.info(s"We are recreating the index: $indexName")
       deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
       createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
     }
-
 
     //log.info("Done initialization, ready to start streaming...")
     println("Done initialization, ready to start streaming...")
@@ -140,7 +134,7 @@ object SendKafkaTopicElasticsearch {
     val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
     // convert csv lines to ES JSON
-    val dataStream = stream.map(line => adaptCsvToPlane(line))
+    val dataStream = stream.map(line => adaptCsvToPlane(line, hasEsriGeohash))
 
     // debug
     if (kDebug) {
@@ -156,18 +150,10 @@ object SendKafkaTopicElasticsearch {
     }
 
     dataStream.foreachRDD { rdd =>
-      try {
-
-        // rdd.foreach(a => {
-        //   println(a)
-        // })
-        EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
-      } catch {
-        case error: Throwable =>
-          println(s"***** rdd.saveJsonToEs($indexName/$DEFAULT_TYPE_NAME) caught the following exception: *****")
-          error.printStackTrace()
-          println(s"***** dropped the current rdd.saveJsonToEs batch (count: ${rdd.count}) and continue with the next batch... *****")
-      }
+      // rdd.foreach(a => {
+      //   println(a)
+      // })
+      EsSpark.saveJsonToEs(rdd, s"$indexName/$DEFAULT_TYPE_NAME")
     }
 
     //log.info("Stream is starting now...")
@@ -178,7 +164,7 @@ object SendKafkaTopicElasticsearch {
     ssc.awaitTermination()
   }
 
-  def adaptCsvToPlane(csvLine: String): String = {
+  def adaptCsvToPlane(csvLine: String, hasEsriGeohash: Boolean): String = {
     objectId = objectId + 1
     val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
 
@@ -198,14 +184,30 @@ object SendKafkaTopicElasticsearch {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
-    //val geohashEnconding = row(11)
-    val squareEncoding = row(12)
-    val pointyTriangleEncoding = row(13)
-    val flatTriangleEncoding = row(14)
-
     val esGeoPoint = s"""[$longitude,$latitude]"""
 
-    s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"square": "$squareEncoding","pointy": "$pointyTriangleEncoding","flat": "$flatTriangleEncoding","geometry": $esGeoPoint}"""
+    //val geohashEnconding = row(11)
+//    val squareEncoding = row(12)
+//    val pointyTriangleEncoding = row(13)
+//    val flatTriangleEncoding = row(14)
+
+    val json = if (hasEsriGeohash) {
+      s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"---geo_hash---": $esGeoPoint,"geometry": $esGeoPoint}"""
+    } else {
+      s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"geometry": $esGeoPoint}"""
+
+    }
+
+
+    if (logOnce) {
+      println("-------")
+      println(s"rowLength: ${row.length}")
+      println(json)
+      logOnce = false
+      println("-------")
+    }
+
+    json
   }
 
   // create the kafka stream
@@ -224,15 +226,6 @@ object SendKafkaTopicElasticsearch {
     }
     val unifiedStream = ssc.union(kafkaStreams)
     unifiedStream
-  }
-
-  def parseEsServer(esNodes: String): String = {
-    val endIndex = esNodes.indexOf(",")
-    if (endIndex == -1) {
-      esNodes
-    } else {
-      esNodes.substring(0, endIndex)
-    }
   }
 
   def deleteIndex(esServer: String, esPort: String, username: String, password: String, indexName: String): Boolean = {
@@ -436,10 +429,11 @@ object SendKafkaTopicElasticsearch {
   }
 }
 
-/**
-  * Helper Case Class, represents an HTTP Response
-  *
-  * @param code    the http code (200, 401, 500, etc)
-  * @param message the http entity message as a string
-  */
-case class HttpResponse(code: Int, message: String) extends Serializable
+///**
+//  * Helper Case Class, represents an HTTP Response
+//  *
+//  * @param code    the http code (200, 401, 500, etc)
+//  * @param message the http entity message as a string
+//  */
+//case class HttpResponse(code: Int, message: String) extends Serializable
+
