@@ -60,7 +60,7 @@ object SendKafkaTopicTimescale {
     val schema = kSchema
     val table = kTable
 
-    val url = s"jdbc:postgresql://$kTimescaleHost:5432/$schema"
+    val url = s"jdbc:postgresql://$kTimescaleHost:5432/realtime"
     val properties = new Properties
     properties.put("user", "realtime")
     properties.put("password", "esri.test")
