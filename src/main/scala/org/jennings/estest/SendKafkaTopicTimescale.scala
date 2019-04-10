@@ -247,7 +247,7 @@ object SendKafkaTopicTimescale {
     val rows = objectMapper.readValues[Array[String]](line)
     val row = rows.nextValue()
     val id = uuid.toString              // NOTE: This is to ensure unique records
-    val ts = dateFormat.format(new Date(System.currentTimeMillis()))
+    val ts = dateFormat.format(new Date(row(1).toLong))
     val speed = row(2).toDouble
     val dist = row(3).toDouble
     val bearing = row(4).toDouble
