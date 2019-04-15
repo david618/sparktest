@@ -57,11 +57,12 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     if (args.length < 13) {
       System.err.println(
         "Usage: SendKafkaTopicElasticsearchWithEsriGeohash" +
-            " [spkMaster] [emitIntervalMS]" +                                                                             // 0-1
-            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                                          // 2-5
-            " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +                     // 6-10
-            " [recreateTable] [debug] <latest=true>" +                                                                    // 11-13
-            " <indexName=planes> <Has EsriGeohash> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>")   // 14-18
+            " [spkMaster] [emitIntervalMS]" +                                                                              // 0-1
+            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                                           // 2-5
+            " [elasticServer] [elasticPort] [elasticUsername] [elasticPassword] [elasticNumShards]" +                      // 6-10
+            " [recreateTable] [debug] <latest=true>" +                                                                     // 11-13
+            " <indexName=planes> <Has EsriGeohash> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>" +   // 14-18
+            " <indexHashFields=false>" )                                                                                   // 19
       System.exit(1)
     }
 
@@ -92,6 +93,8 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     val refreshInterval: String = if (args.length > 16) args(16) else "60s"
     val maxRecordCount: Int = if (args.length > 17) args(17).toInt else 10000
     val replicationFactor: Int = if (args.length > 18) args(18).toInt else 0
+    val indexHashFields: Boolean = if (args.length > 19) args(19).toBoolean else false
+
 
     val sConf = new SparkConf(true)
       //.set("es.index.auto.create", "true")
@@ -118,8 +121,9 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
       println(s"We are recreating the index: $indexName")
       //log.info(s"We are recreating the index: $indexName")
       deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
-      createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
+      createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount, indexHashFields)
     }
+
 
     //log.info("Done initialization, ready to start streaming...")
     println("Done initialization, ready to start streaming...")
@@ -184,12 +188,12 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
-    val esGeoPoint = s"""[$longitude,$latitude]"""
-
     //val geohashEnconding = row(11)
-//    val squareEncoding = row(12)
-//    val pointyTriangleEncoding = row(13)
-//    val flatTriangleEncoding = row(14)
+    //val squareEncoding = row(12)
+    //val pointyTriangleEncoding = row(13)
+    //val flatTriangleEncoding = row(14)
+
+    val esGeoPoint = s"""[$longitude,$latitude]"""
 
     val json = if (hasEsriGeohash) {
       s"""{"objectid": $objectId,"globalid": "$globalid","plane_id": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secstodep": $secsToDep,"lon": $longitude,"lat": $latitude,"---geo_hash---": $esGeoPoint,"geometry": $esGeoPoint}"""
@@ -228,6 +232,15 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     unifiedStream
   }
 
+  def parseEsServer(esNodes: String): String = {
+    val endIndex = esNodes.indexOf(",")
+    if (endIndex == -1) {
+      esNodes
+    } else {
+      esNodes.substring(0, endIndex)
+    }
+  }
+
   def deleteIndex(esServer: String, esPort: String, username: String, password: String, indexName: String): Boolean = {
     val client = HttpClients.createDefault()
     try {
@@ -253,10 +266,12 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     }
   }
 
-  def createIndex(esServer: String, esPort: String, username: String, password: String, indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): Boolean = {
+  def createIndex(esServer: String, esPort: String, username: String, password: String,
+                  indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int,
+                  indexHashFields: Boolean): Boolean = {
 
     val aliasName = s"${indexName}_alias"
-    val indexJson = getIndexJson(indexName, aliasName, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
+    val indexJson = getIndexJson(indexName, aliasName, replicationFactor, numOfShards, refreshInterval, maxRecordCount, indexHashFields)
     //println(indexJson)
     val client = HttpClients.createDefault()
     try {
@@ -287,10 +302,9 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
     }
   }
 
-  private def getDataIndexMappingJson(): String = {
+  private def getDataIndexMappingJson(indexHashFields: Boolean): String = {
     val indexMappingJson =
       s"""
-         |"$DEFAULT_TYPE_NAME": {
          |  "properties": {
          |    "globalid": {
          |      "type": "keyword"
@@ -333,25 +347,27 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
          |      "type": "double"
          |    },
          |    "square": {
-         |      "type": "keyword"
+         |      "type": "keyword",
+         |      "enabled": ${indexHashFields.toString}
          |    },
          |    "pointy": {
          |      "type": "keyword"
+         |      "enabled": ${indexHashFields.toString}
          |    },
          |    "flat": {
-         |      "type": "keyword"
+         |      "type": "keyword",
+         |      "enabled": ${indexHashFields.toString}
          |    },
          |    "geometry": {
          |      "type": "geo_point"
          |    }
          |  }
-         |}
      """.stripMargin
 
     indexMappingJson
   }
 
-  private def getIndexJson(indexName: String, aliasName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): String = {
+  private def getIndexJson(indexName: String, aliasName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int, indexHashFields: Boolean): String = {
     val indexSettingsJson =
       s"""
          |{
@@ -364,7 +380,7 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
          |}
       """.stripMargin
 
-    val indexMappingJson = getDataIndexMappingJson()
+    val indexMappingJson = getDataIndexMappingJson(indexHashFields)
 
     val indexJson =
       s"""
@@ -429,11 +445,10 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
   }
 }
 
-///**
-//  * Helper Case Class, represents an HTTP Response
-//  *
-//  * @param code    the http code (200, 401, 500, etc)
-//  * @param message the http entity message as a string
-//  */
+/**
+  * Helper Case Class, represents an HTTP Response
+  *
+  * @param code    the http code (200, 401, 500, etc)
+  * @param message the http entity message as a string
+  */
 //case class HttpResponse(code: Int, message: String) extends Serializable
-

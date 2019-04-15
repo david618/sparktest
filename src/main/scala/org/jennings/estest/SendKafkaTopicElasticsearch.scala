@@ -57,12 +57,13 @@ object SendKafkaTopicElasticsearch {
     if (args.length < 13) {
       System.err.println(
         "Usage: SendKafkaTopicElasticsearch" +
-            " [spkMaster] [emitIntervalMS]" +                                                         // 0-1
-            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                      // 2-5
-            " [esNodes] [esPort] [esUsername] [esPassword] [esNumOfShards] [esRecreateIndex] " +      // 6-11
-            " [debug]" +                                                                              // 12
-            " <latest=true>" +                                                                        // 13
-            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>") // 14-17
+            " [spkMaster] [emitIntervalMS]" +                                                           // 0-1
+            " [kafkaBrokers] [kafkaConsumerGroup] [kafkaTopic] [kafkaThreads]" +                        // 2-5
+            " [esNodes] [esPort] [esUsername] [esPassword] [esNumOfShards] [esRecreateIndex] " +        // 6-11
+            " [debug]" +                                                                                // 12
+            " <latest=true>" +                                                                          // 13
+            " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>" +  // 14-17
+            " <indexHashFields=false>" )                                                                // 18
       System.exit(1)
     }
 
@@ -91,6 +92,7 @@ object SendKafkaTopicElasticsearch {
     val refreshInterval: String = if (args.length > 15) args(15) else "60s"
     val maxRecordCount: Int = if (args.length > 16) args(16).toInt else 10000
     val replicationFactor: Int = if (args.length > 17) args(17).toInt else 0
+    val indexHashFields: Boolean = if (args.length > 18) args(18).toBoolean else false
 
 
     val sConf = new SparkConf(true)
@@ -123,7 +125,7 @@ object SendKafkaTopicElasticsearch {
       println(s"Recreating the index '$indexName' using ES node '$esServer' ...")
       //log.info(s"Recreating the index '$indexName' using ES node '$esServer' ...")
       deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
-      createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
+      createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount, indexHashFields)
     }
 
 
@@ -260,10 +262,12 @@ object SendKafkaTopicElasticsearch {
     }
   }
 
-  def createIndex(esServer: String, esPort: String, username: String, password: String, indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): Boolean = {
+  def createIndex(esServer: String, esPort: String, username: String, password: String,
+                  indexName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int,
+                  indexHashFields: Boolean): Boolean = {
 
     val aliasName = s"${indexName}_alias"
-    val indexJson = getIndexJson(indexName, aliasName, replicationFactor, numOfShards, refreshInterval, maxRecordCount)
+    val indexJson = getIndexJson(indexName, aliasName, replicationFactor, numOfShards, refreshInterval, maxRecordCount, indexHashFields)
     //println(indexJson)
     val client = HttpClients.createDefault()
     try {
@@ -294,10 +298,9 @@ object SendKafkaTopicElasticsearch {
     }
   }
 
-  private def getDataIndexMappingJson(): String = {
+  private def getDataIndexMappingJson(indexHashFields: Boolean): String = {
     val indexMappingJson =
       s"""
-         |"$DEFAULT_TYPE_NAME": {
          |  "properties": {
          |    "globalid": {
          |      "type": "keyword"
@@ -340,25 +343,28 @@ object SendKafkaTopicElasticsearch {
          |      "type": "double"
          |    },
          |    "square": {
-         |      "type": "keyword"
+         |      "type": "keyword",
+         |      "enabled": ${indexHashFields.toString}
+         |
          |    },
          |    "pointy": {
          |      "type": "keyword"
+         |      "enabled": ${indexHashFields.toString}
          |    },
          |    "flat": {
-         |      "type": "keyword"
+         |      "type": "keyword",
+         |      "enabled": ${indexHashFields.toString}
          |    },
          |    "geometry": {
          |      "type": "geo_point"
          |    }
          |  }
-         |}
      """.stripMargin
 
     indexMappingJson
   }
 
-  private def getIndexJson(indexName: String, aliasName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int): String = {
+  private def getIndexJson(indexName: String, aliasName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int, indexHashFields: Boolean): String = {
     val indexSettingsJson =
       s"""
          |{
@@ -371,7 +377,7 @@ object SendKafkaTopicElasticsearch {
          |}
       """.stripMargin
 
-    val indexMappingJson = getDataIndexMappingJson()
+    val indexMappingJson = getDataIndexMappingJson(indexHashFields)
 
     val indexJson =
       s"""

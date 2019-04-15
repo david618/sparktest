@@ -19,7 +19,7 @@
     <scala.version>2.11.12</scala.version>
     <spark.version>2.3.2</spark.version>
     <scala.dep.version>2.11</scala.dep.version>
-    <es.version>6.6.1</es.version>
+    <es.version>7.0.0</es.version>
     <mainClass>org.jennings.estest.SendFileElasticsearchFile</mainClass>
     <datastax.version>6.7.1</datastax.version>
     <junit.version>4.12</junit.version>

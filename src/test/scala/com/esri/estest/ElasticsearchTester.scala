@@ -15,8 +15,9 @@ class ElasticsearchTester extends FunSuite {
     val esNumOfShards = 1
     val refreshInterval = "1s"
     val maxRecordCount = 10000
+    val indexHashFields = false
 
-    val success = SendKafkaTopicElasticsearch.createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount)
+    val success = SendKafkaTopicElasticsearch.createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount, indexHashFields)
     assert(success == true)
   }
 
