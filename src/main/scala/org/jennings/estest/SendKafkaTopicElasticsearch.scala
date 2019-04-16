@@ -95,31 +95,7 @@ object SendKafkaTopicElasticsearch {
     val indexHashFields: Boolean = if (args.length > 18) args(18).toBoolean else false
 
 
-    val sConf = new SparkConf(true)
-        .setAppName(getClass.getSimpleName)
-        .set("es.nodes", esNodes)
-        .set("es.port", esPort)
-        .set("es.net.http.auth.user", esUsername)
-        .set("es.net.http.auth.pass", esPassword)
-
-      //.set("es.index.auto.create", "true")
-
-      // without the following it would not create the index on single-node mode
-      //.set("es.nodes.discovery", "false")
-      //.set("es.nodes.data.only", "false")
-
-      // without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
-      //.set("es.nodes.wan.only", "true")
-
-
-    val sc = new SparkContext(sparkMaster, "KafkaToElastic", sConf)
-
-    println(s"*** Running spark with config:")
-    sConf.getAll.foreach(println)
-    println(s"***")
-
-
-    // The following deletes and creates an Elasticsearch Index, otherwise assumes the index already exists
+    // Recreate the Elasticsearch index if need to
     if (esRecreateIndex) {
       val esServer = parseEsServer(esNodes)
       println(s"Recreating the index '$indexName' using ES node '$esServer' ...")
@@ -127,6 +103,30 @@ object SendKafkaTopicElasticsearch {
       deleteIndex(esServer, esPort, esUsername, esPassword, indexName)
       createIndex(esServer, esPort, esUsername, esPassword, indexName, replicationFactor, esNumOfShards, refreshInterval, maxRecordCount, indexHashFields)
     }
+
+
+    // Create the Spark Context
+    val sConf = new SparkConf(true)
+        .setAppName(getClass.getSimpleName)
+        .set("es.nodes", esNodes)
+        .set("es.port", esPort)
+        .set("es.net.http.auth.user", esUsername)
+        .set("es.net.http.auth.pass", esPassword)
+
+    //.set("es.index.auto.create", "true")
+
+    // without the following it would not create the index on single-node mode
+    //.set("es.nodes.discovery", "false")
+    //.set("es.nodes.data.only", "false")
+
+    // without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
+    //.set("es.nodes.wan.only", "true")
+
+    val sc = new SparkContext(sparkMaster, "KafkaToElastic", sConf)
+
+    println(s"*** Running spark with config:")
+    sConf.getAll.foreach(println)
+    println(s"***")
 
 
     //log.info("Done initialization, ready to start streaming...")
@@ -342,19 +342,9 @@ object SendKafkaTopicElasticsearch {
          |    "lat": {
          |      "type": "double"
          |    },
-         |    "square": {
-         |      "type": "keyword",
-         |      "enabled": ${indexHashFields.toString}
-         |
-         |    },
-         |    "pointy": {
-         |      "type": "keyword",
-         |      "enabled": ${indexHashFields.toString}
-         |    },
-         |    "flat": {
-         |      "type": "keyword",
-         |      "enabled": ${indexHashFields.toString}
-         |    },
+         |    "square": ${getHashFieldMappingJson(indexHashFields)},
+         |    "pointy": ${getHashFieldMappingJson(indexHashFields)},
+         |    "flat": ${getHashFieldMappingJson(indexHashFields)},
          |    "geometry": {
          |      "type": "geo_point"
          |    }
@@ -364,13 +354,28 @@ object SendKafkaTopicElasticsearch {
     indexMappingJson
   }
 
+  private def getHashFieldMappingJson(indexHashFields: Boolean): String = {
+    val typeValue = if (indexHashFields) "keyword" else "object"
+    val enabledValue = indexHashFields.toString
+
+    val hashFieldMappingJson =
+      s"""
+       |{
+       |  "type": "$typeValue",
+       |  "enabled": $enabledValue
+       |}
+      """.stripMargin
+
+    hashFieldMappingJson
+  }
+
   private def getIndexJson(indexName: String, aliasName: String, replicationFactor: Int, numOfShards: Int, refreshInterval: String, maxRecordCount: Int, indexHashFields: Boolean): String = {
     val indexSettingsJson =
       s"""
          |{
          |  "index": {
-         |    "number_of_shards": "$numOfShards",
-         |    "number_of_replicas": "$replicationFactor",
+         |    "number_of_shards": $numOfShards,
+         |    "number_of_replicas": $replicationFactor,
          |    "refresh_interval": "$refreshInterval",
          |    "max_result_window": $maxRecordCount
          |  }
