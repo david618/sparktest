@@ -351,7 +351,7 @@ object SendKafkaTopicElasticsearchWithEsriGeohash {
          |      "enabled": ${indexHashFields.toString}
          |    },
          |    "pointy": {
-         |      "type": "keyword"
+         |      "type": "keyword",
          |      "enabled": ${indexHashFields.toString}
          |    },
          |    "flat": {
