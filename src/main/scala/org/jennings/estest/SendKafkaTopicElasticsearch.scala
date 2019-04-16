@@ -252,6 +252,7 @@ object SendKafkaTopicElasticsearch {
           true
 
         case HttpResponse(code, httpErrorMsg) =>
+          println(s"""Error deleting index $indexName. Respose: [$deleteResponseAsString"] , Error: [$httpErrorMsg]""")
           false
       }
     } catch {
@@ -288,6 +289,7 @@ object SendKafkaTopicElasticsearch {
           true
 
         case HttpResponse(code, httpErrorMsg) =>
+          println(s"""Error creating index $indexName. Respose: [$createResponseAsString"] , error: [$httpErrorMsg]""")
           false
       }
     } catch {
@@ -355,16 +357,21 @@ object SendKafkaTopicElasticsearch {
   }
 
   private def getHashFieldMappingJson(indexHashFields: Boolean): String = {
-    val typeValue = if (indexHashFields) "keyword" else "object"
-    val enabledValue = indexHashFields.toString
-
     val hashFieldMappingJson =
-      s"""
-       |{
-       |  "type": "$typeValue",
-       |  "enabled": $enabledValue
-       |}
-      """.stripMargin
+      if (indexHashFields) {
+        s"""
+           |{
+           |  "type": "keyword"
+           |}
+         """.stripMargin
+      } else {
+        s"""
+           |{
+           |  "type": "object",
+           |  "enabled": false
+           |}
+         """.stripMargin
+      }
 
     hashFieldMappingJson
   }
