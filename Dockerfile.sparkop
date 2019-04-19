@@ -1,0 +1,11 @@
+# sudo docker build -t david62243/sparktest:v0.4-2.4.0 -f Dockerfile.sparkop .
+# sudo docker push david62243/sparktest:v0.4-2.4.0
+FROM gcr.io/spark-operator/spark:v2.4.0
+
+RUN apk add tmux
+
+COPY target/dependency-jars /opt/spark/work-dir/dependency-jars
+COPY target/sparktest.jar /opt/spark/work-dir/sparktest.jar
+COPY target/sparktest-full.jar /opt/spark/work-dir/sparktest-full.jar
+COPY log4j2conf.xml /opt/spark/work-dir/log4j2conf.xml
+COPY log4j.properties /opt/spark/work-dir/log4j.properties
