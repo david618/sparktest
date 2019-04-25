@@ -347,9 +347,7 @@ object SendKafkaTopicElasticsearch {
          |    "square": ${getHashFieldMappingJson(indexHashFields)},
          |    "pointy": ${getHashFieldMappingJson(indexHashFields)},
          |    "flat": ${getHashFieldMappingJson(indexHashFields)},
-         |    "geometry": {
-         |      "type": "geo_point"
-         |    }
+         |    "geometry": ${getGeoHashFieldMappingJson(indexHashFields)}
          |  }
      """.stripMargin
 
@@ -369,6 +367,26 @@ object SendKafkaTopicElasticsearch {
            |{
            |  "type": "object",
            |  "enabled": false
+           |}
+         """.stripMargin
+      }
+
+    hashFieldMappingJson
+  }
+
+  private def getGeoHashFieldMappingJson(indexHashFields: Boolean): String = {
+    val hashFieldMappingJson =
+      if (indexHashFields) {
+        s"""
+           |{
+           |  "type": "geo_point"
+           |}
+         """.stripMargin
+      } else {
+        s"""
+           |{
+           |  "type": "geo_point",
+           |  "doc_values": false
            |}
          """.stripMargin
       }
