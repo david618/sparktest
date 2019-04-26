@@ -63,7 +63,7 @@ object SendKafkaTopicElasticsearch {
             " [debug]" +                                                                                // 12
             " <latest=true>" +                                                                          // 13
             " <indexName=planes> <refreshInterval=60s> <maxRecordCount=10000> <replicationFactor=0>" +  // 14-17
-            " <indexHashFields=false>" )                                                                // 18
+            " <indexHashFields=false> <withExtraGeoHashes=true> <withAggPlugin=false>" )                // 18-20
       System.exit(1)
     }
 
@@ -94,6 +94,8 @@ object SendKafkaTopicElasticsearch {
     val replicationFactor: Int = if (args.length > 17) args(17).toInt else 0
     val indexHashFields: Boolean = if (args.length > 18) args(18).toBoolean else false
 
+    val withExtraGeoHashes: Boolean = if (args.length > 19) args(19).toBoolean else true
+    val withAggPlugin: Boolean = if (args.length > 20) args(20).toBoolean else false
 
     // Recreate the Elasticsearch index if need to
     if (esRecreateIndex) {
@@ -142,7 +144,7 @@ object SendKafkaTopicElasticsearch {
     val stream = createKafkaStream(ssc, kBrokers, kConsumerGroup, kTopics, kThreads.toInt, resetToStr)
 
     // convert csv lines to ES JSON
-    val dataStream = stream.map(line => adaptCsvToPlane(line))
+    val dataStream = stream.map(line => adaptCsvToPlane(line, withExtraGeoHashes, withAggPlugin))
 
     // debug
     if (kDebug) {
@@ -180,7 +182,7 @@ object SendKafkaTopicElasticsearch {
     ssc.awaitTermination()
   }
 
-  def adaptCsvToPlane(csvLine: String): String = {
+  def adaptCsvToPlane(csvLine: String, withExtraGeoHashes: Boolean, withAggPlugin: Boolean): String = {
     objectId = objectId + 1
     val uuid = new UUID(RANDOM.nextLong(), RANDOM.nextLong())
 
@@ -200,14 +202,40 @@ object SendKafkaTopicElasticsearch {
     val secsToDep = row(8).toInt
     val longitude = row(9).toDouble
     val latitude = row(10).toDouble
-    //val geohashEnconding = row(11)
-    val squareEncoding = row(12)
-    val pointyTriangleEncoding = row(13)
-    val flatTriangleEncoding = row(14)
 
     val esGeoPoint = s"""[$longitude,$latitude]"""
 
-    s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude,"square": "$squareEncoding","pointy": "$pointyTriangleEncoding","flat": "$flatTriangleEncoding","geometry": $esGeoPoint}"""
+    val json = s"""{"objectid": $objectId,"globalid": "$globalid","planeid": "$planeid","ts": $ts,"speed": $speed,"dist": $dist,"bearing": $bearing,"rtid": $rtid,"orig": "$orig","dest": "$dest","secsToDep": $secsToDep,"longitude": $longitude,"latitude": $latitude, ${concatExtraGeoHashValuesJson(withExtraGeoHashes,row)} ${concatEsriGeoHashValueJson(withAggPlugin, esGeoPoint)} "geometry": $esGeoPoint}"""
+
+    if (logOnce) {
+      println("-------")
+      println(s"rowLength: ${row.length}")
+      println(json)
+      logOnce = false
+      println("-------")
+    }
+
+    json
+  }
+
+  private def concatEsriGeoHashValueJson(withAggPlugin: Boolean, esGeoPoint: String) : String = {
+    if (withAggPlugin)
+      s""""---geo_hash---": $esGeoPoint,"""
+    else
+      ""
+  }
+
+  private def concatExtraGeoHashValuesJson(withExtraGeoHashes: Boolean, row: Array[String]) : String = {
+    if (withExtraGeoHashes) {
+      //val geohashEnconding = row(11)
+      val squareEncoding = row(12)
+      val pointyTriangleEncoding = row(13)
+      val flatTriangleEncoding = row(14)
+
+      s""""square": "$squareEncoding","pointy": "$pointyTriangleEncoding","flat": "$flatTriangleEncoding","""
+    } else {
+      ""
+    }
   }
 
   // create the kafka stream
