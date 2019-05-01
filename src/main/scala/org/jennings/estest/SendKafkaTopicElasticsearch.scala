@@ -115,15 +115,6 @@ object SendKafkaTopicElasticsearch {
         .set("es.net.http.auth.user", esUsername)
         .set("es.net.http.auth.pass", esPassword)
 
-    //.set("es.index.auto.create", "true")
-
-    // without the following it would not create the index on single-node mode
-    //.set("es.nodes.discovery", "false")
-    //.set("es.nodes.data.only", "false")
-
-    // without setting es.nodes.wan.only the index was created but loading data failed (5.5.1)
-    //.set("es.nodes.wan.only", "true")
-
     val sc = new SparkContext(sparkMaster, "KafkaToElastic", sConf)
 
     println(s"*** Running spark with config:")
